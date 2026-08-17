@@ -5,8 +5,11 @@ import time
 
 from flask import Flask, jsonify, request, send_from_directory
 
+import analytics
+import alerts
 import config
 import engine
+import journal
 import mt5_bridge
 
 app = Flask(__name__, static_folder="static")
@@ -15,6 +18,9 @@ bridge = mt5_bridge
 state = config.new_state()
 strategy_settings = copy.deepcopy(config.DEFAULT_SETTINGS)
 global_settings = copy.deepcopy(config.GLOBAL_SETTINGS)
+alert_rules = []
+triggered_alerts = []
+_next_alert_id = 1
 
 _engine_thread = None
 _stop_flag = threading.Event()
@@ -36,6 +42,7 @@ def status():
         "symbol": state["symbol"],
         "timeframe": state["timeframe"],
         "auto_enabled": state["auto_enabled"],
+        "triggered_alerts": triggered_alerts,
     })
 
 
@@ -104,10 +111,69 @@ def close_all():
     return jsonify({"ok": True})
 
 
+@app.route("/api/alerts", methods=["GET"])
+def get_alerts():
+    return jsonify(alert_rules)
+
+
+@app.route("/api/alerts", methods=["POST"])
+def post_alert():
+    global _next_alert_id
+    data = request.get_json()
+    rule = {"id": _next_alert_id, "symbol": data["symbol"],
+            "condition": data["condition"], "price": data["price"]}
+    _next_alert_id += 1
+    alert_rules.append(rule)
+    return jsonify(rule)
+
+
+@app.route("/api/alerts/<int:alert_id>", methods=["DELETE"])
+def delete_alert(alert_id):
+    alert_rules[:] = [r for r in alert_rules if r["id"] != alert_id]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/alerts/ack/<alert_id>", methods=["POST"])
+def ack_alert(alert_id):
+    try:
+        alert_id_val = int(alert_id)
+    except ValueError:
+        alert_id_val = alert_id
+    triggered_alerts[:] = [t for t in triggered_alerts if t["id"] != alert_id_val]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/journal/<int:ticket>", methods=["GET"])
+def get_journal(ticket):
+    return jsonify({"note": journal.get_note(ticket)})
+
+
+@app.route("/api/journal/<int:ticket>", methods=["POST"])
+def post_journal(ticket):
+    data = request.get_json()
+    journal.set_note(ticket, data["note"])
+    return jsonify({"ok": True})
+
+
+@app.route("/api/analytics")
+def get_analytics():
+    from datetime import datetime, timedelta
+    from_date = datetime.now() - timedelta(days=30)
+    deals = bridge.get_history_deals(from_date)
+    return jsonify(analytics.compute_stats(deals))
+
+
+@app.route("/api/position_manager/apply_all", methods=["POST"])
+def apply_all():
+    engine._manage_positions(bridge, global_settings, alert_rules, triggered_alerts)
+    return jsonify({"ok": True})
+
+
 def _engine_loop():
     while not _stop_flag.is_set():
         engine.run_once(bridge, state, strategy_settings, global_settings,
-                         daily_pnl_percent=0.0, drawdown_percent=0.0)
+                         daily_pnl_percent=0.0, drawdown_percent=0.0,
+                         alert_rules=alert_rules, triggered_alerts=triggered_alerts)
         time.sleep(5)
 
 

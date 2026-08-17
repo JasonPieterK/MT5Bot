@@ -4,7 +4,9 @@ import csv
 import os
 from datetime import datetime, timezone
 
+import alerts
 import risk_manager as rm
+import trailing_manager
 from strategies import trend, scalping, smc, grid, pivot_breakout
 
 STRATEGY_MODULES = {
@@ -27,7 +29,29 @@ def log_trade(row):
         writer.writerow(row)
 
 
-def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percent, drawdown_percent):
+def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts):
+    positions = bridge.get_open_positions()
+    for pos in positions:
+        if global_settings.get("trailing_enabled", False):
+            trailing_manager.apply_trailing(
+                bridge, pos, global_settings.get("trailing_distance_points", 100))
+        if global_settings.get("breakeven_enabled", False):
+            trailing_manager.apply_breakeven(
+                bridge, pos,
+                global_settings.get("breakeven_trigger_points", 100),
+                global_settings.get("breakeven_offset_points", 10))
+
+    triggered = alerts.check_price_alerts(bridge, alert_rules)
+    for rule in triggered:
+        alert_rules.remove(rule)
+        triggered_alerts.append(rule)
+
+    if alerts.check_margin_alert(bridge, global_settings.get("margin_alert_level_percent", 100.0)):
+        triggered_alerts.append({"id": "margin", "type": "margin", "message": "margin level below threshold"})
+
+
+def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percent, drawdown_percent,
+             alert_rules=None, triggered_alerts=None):
     open_positions = bridge.get_open_positions(state["symbol"])
 
     if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
@@ -35,6 +59,9 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
             bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"], pos["type"],
                                    global_settings["slippage_points"])
         return
+
+    _manage_positions(bridge, global_settings, alert_rules if alert_rules is not None else [],
+                       triggered_alerts if triggered_alerts is not None else [])
 
     strategy_name = state["active_strategy"]
     if strategy_name == "grid":

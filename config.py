@@ -47,6 +47,12 @@ GLOBAL_SETTINGS = {
     "daily_loss_limit_percent": 5.0,
     "max_drawdown_percent": 15.0,
     "slippage_points": 20,
+    "trailing_enabled": False,
+    "trailing_distance_points": 100,
+    "breakeven_enabled": False,
+    "breakeven_trigger_points": 100,
+    "breakeven_offset_points": 10,
+    "margin_alert_level_percent": 100.0,
 }
 
 

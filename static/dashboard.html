@@ -41,6 +41,9 @@
   </select>
   <button id="autoBtn" class="off">AUTO: OFF</button>
   <button id="closeAllBtn">Close All</button>
+  <button id="navPositionMgr">Position Mgr</button>
+  <button id="navAnalytics">Analytics</button>
+  <button id="navAlerts">Alerts</button>
 </header>
 <main>
   <section class="panel">
@@ -57,10 +60,49 @@
     <div class="row-actions"><button id="saveSettingsBtn">Save Settings</button></div>
     <h3 style="margin-top:20px;">Open Positions</h3>
     <table>
-      <thead><tr><th>Ticket</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Profit</th></tr></thead>
+      <thead><tr><th>Ticket</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Profit</th><th>Note</th></tr></thead>
       <tbody id="positionsBody"></tbody>
     </table>
   </section>
+
+  <section class="panel" id="positionMgrPanel" style="display:none; grid-column: span 2;">
+    <h3>Position Manager (applies to ALL open positions, any origin)</h3>
+    <div class="settings-grid">
+      <div class="field"><label>Trailing Enabled</label>
+        <select id="trailingEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>Trailing Distance (points)</label><input id="trailingDistance" value="100"></div>
+      <div class="field"><label>Break-Even Enabled</label>
+        <select id="beEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>BE Trigger (points)</label><input id="beTrigger" value="100"></div>
+      <div class="field"><label>BE Offset (points)</label><input id="beOffset" value="10"></div>
+      <div class="field"><label>Margin Alert Level %</label><input id="marginAlertLevel" value="100"></div>
+    </div>
+    <div class="row-actions">
+      <button id="savePositionMgrBtn">Save</button>
+      <button id="applyAllBtn">Apply Now to All Positions</button>
+    </div>
+  </section>
+
+  <section class="panel" id="analyticsPanel" style="display:none; grid-column: span 2;">
+    <h3>Analytics (last 30 days, full account history)</h3>
+    <div class="stat"><span>Win Rate</span><span id="statWinRate">-</span></div>
+    <div class="stat"><span>Profit Factor</span><span id="statProfitFactor">-</span></div>
+    <div class="stat"><span>Current Streak</span><span id="statStreak">-</span></div>
+  </section>
+
+  <section class="panel" id="alertsPanel" style="display:none; grid-column: span 2;">
+    <h3>Price &amp; Margin Alerts</h3>
+    <div class="row-actions">
+      <input id="alertSymbol" placeholder="EURUSD" style="width:100px;">
+      <select id="alertCondition"><option value="above">above</option><option value="below">below</option></select>
+      <input id="alertPrice" placeholder="price" style="width:100px;">
+      <button id="addAlertBtn">Add Alert</button>
+    </div>
+    <table><thead><tr><th>Symbol</th><th>Condition</th><th>Price</th><th></th></tr></thead>
+      <tbody id="alertsBody"></tbody></table>
+  </section>
+
+  <div id="alertBanner" style="display:none; position:fixed; top:10px; right:10px; background:var(--red); color:#fff; padding:12px 16px; border-radius:8px;"></div>
 </main>
 <script>
 const STRATEGIES = ["trend", "scalping", "smc", "grid", "pivot_breakout"];
@@ -84,9 +126,20 @@ async function refreshStatus() {
   body.innerHTML = "";
   data.positions.forEach(p => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${p.ticket}</td><td>${p.symbol}</td><td>${p.type}</td><td>${p.volume}</td><td>${p.profit}</td>`;
+    tr.innerHTML = `<td>${p.ticket}</td><td>${p.symbol}</td><td>${p.type}</td><td>${p.volume}</td><td>${p.profit}</td><td><button data-ticket="${p.ticket}">Note</button></td>`;
+    tr.querySelector("button").onclick = () => editNote(p.ticket);
     body.appendChild(tr);
   });
+}
+
+async function editNote(ticket) {
+  const res = await fetch(`/api/journal/${ticket}`);
+  const data = await res.json();
+  const note = prompt("Note for ticket " + ticket, data.note || "");
+  if (note !== null) {
+    await fetch(`/api/journal/${ticket}`, { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ note }) });
+  }
 }
 
 function renderTabs() {
@@ -164,6 +217,93 @@ document.getElementById("closeAllBtn").onclick = async () => {
   refreshStatus();
 };
 document.getElementById("saveSettingsBtn").onclick = saveSettings;
+
+function showPanel(id) {
+  ["positionMgrPanel", "analyticsPanel", "alertsPanel"].forEach(p => {
+    document.getElementById(p).style.display = (p === id) ? "block" : "none";
+  });
+}
+document.getElementById("navPositionMgr").onclick = () => { showPanel("positionMgrPanel"); };
+document.getElementById("navAnalytics").onclick = () => { showPanel("analyticsPanel"); loadAnalytics(); };
+document.getElementById("navAlerts").onclick = () => { showPanel("alertsPanel"); loadAlerts(); };
+
+document.getElementById("savePositionMgrBtn").onclick = async () => {
+  await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      trailing_enabled: document.getElementById("trailingEnabled").value === "true",
+      trailing_distance_points: Number(document.getElementById("trailingDistance").value),
+      breakeven_enabled: document.getElementById("beEnabled").value === "true",
+      breakeven_trigger_points: Number(document.getElementById("beTrigger").value),
+      breakeven_offset_points: Number(document.getElementById("beOffset").value),
+      margin_alert_level_percent: Number(document.getElementById("marginAlertLevel").value),
+    }) });
+};
+document.getElementById("applyAllBtn").onclick = async () => {
+  await fetch("/api/position_manager/apply_all", { method: "POST" });
+};
+
+async function loadAnalytics() {
+  const res = await fetch("/api/analytics");
+  const data = await res.json();
+  document.getElementById("statWinRate").textContent = data.win_rate + "%";
+  document.getElementById("statProfitFactor").textContent = data.profit_factor;
+  document.getElementById("statStreak").textContent = data.current_streak;
+}
+
+async function loadAlerts() {
+  const res = await fetch("/api/alerts");
+  const rules = await res.json();
+  const body = document.getElementById("alertsBody");
+  body.innerHTML = "";
+  rules.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.symbol}</td><td>${r.condition}</td><td>${r.price}</td><td><button data-id="${r.id}">Delete</button></td>`;
+    tr.querySelector("button").onclick = async () => {
+      await fetch(`/api/alerts/${r.id}`, { method: "DELETE" });
+      loadAlerts();
+    };
+    body.appendChild(tr);
+  });
+}
+document.getElementById("addAlertBtn").onclick = async () => {
+  await fetch("/api/alerts", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      symbol: document.getElementById("alertSymbol").value,
+      condition: document.getElementById("alertCondition").value,
+      price: Number(document.getElementById("alertPrice").value),
+    }) });
+  loadAlerts();
+};
+
+function beep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 880;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.2, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.4);
+}
+
+let ackedIds = new Set();
+async function checkTriggeredAlerts() {
+  const res = await fetch("/api/status");
+  const data = await res.json();
+  const banner = document.getElementById("alertBanner");
+  const fresh = (data.triggered_alerts || []).find(t => !ackedIds.has(t.id));
+  if (fresh) {
+    banner.textContent = fresh.type === "margin" ? "MARGIN ALERT: " + fresh.message : `PRICE ALERT: ${fresh.symbol} ${fresh.condition} ${fresh.price}`;
+    banner.style.display = "block";
+    ackedIds.add(fresh.id);
+    beep();
+    fetch(`/api/alerts/ack/${fresh.id}`, { method: "POST" });
+    setTimeout(() => { banner.style.display = "none"; }, 8000);
+  }
+}
+setInterval(checkTriggeredAlerts, 3000);
 
 renderTabs();
 renderSettingsForm();

@@ -1,6 +1,7 @@
 """Thin wrapper over the MetaTrader5 package. All MT5 API calls go through here."""
 import MetaTrader5 as mt5
 import pandas as pd
+from datetime import datetime
 
 TIMEFRAME_MAP = {
     "M1": mt5.TIMEFRAME_M1,
@@ -81,3 +82,35 @@ def close_position(ticket, symbol, volume, direction, slippage_points):
 def get_account_equity():
     info = mt5.account_info()
     return info.equity if info else 0.0
+
+
+def get_current_price(symbol):
+    tick = mt5.symbol_info_tick(symbol)
+    return tick.bid, tick.ask
+
+
+def modify_position(ticket, sl, tp):
+    request = {
+        "action": mt5.TRADE_ACTION_SLTP,
+        "position": ticket,
+        "sl": sl,
+        "tp": tp,
+    }
+    result = mt5.order_send(request)
+    ok = result.retcode == mt5.TRADE_RETCODE_DONE
+    return ok, result.retcode
+
+
+def get_margin_level():
+    info = mt5.account_info()
+    return info.margin_level if info and info.margin_level else 0.0
+
+
+def get_history_deals(from_date):
+    deals = mt5.history_deals_get(from_date, datetime.now())
+    if deals is None:
+        return []
+    return [
+        {"ticket": d.ticket, "symbol": d.symbol, "profit": d.profit, "time": d.time}
+        for d in deals if d.entry == mt5.DEAL_ENTRY_OUT
+    ]
