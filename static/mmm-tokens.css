@@ -1,0 +1,242 @@
+/* ============================================================
+   Mean Median Mode — design tokens
+   Import in any HTML: <link rel="stylesheet" href="../colors_and_type.css">
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Unbounded:wght@400;500;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Caveat:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ---------- BRAND COLORS ---------- */
+  /* The quartet — the four central concepts MMM teaches */
+  --mean:     #FF3D8A;  /* hot magenta */
+  --median:   #2D7FF9;  /* electric blue */
+  --mode:     #B8E22B;  /* lime */
+  --quartile: #6B3FA0;  /* deep purple — boxplot territory */
+
+  /* Quartile sub-values. Q2 IS the median — it borrows --median on purpose. */
+  --q1: #FFC93C;        /* sun     — lower quartile */
+  --q2: var(--median);  /* median  — the middle one */
+  --q3: #FF6B4A;        /* coral   — upper quartile */
+
+  /* Supporting accents (kept as raw colors for use elsewhere) */
+  --sun:   #FFC93C;
+  --coral: #FF6B4A;
+  --plum:  #6B3FA0;
+
+  /* Tints (used for subtle washes / hover backgrounds) */
+  --mean-50:     #FFE6F0;
+  --median-50:   #E1ECFF;
+  --mode-50:     #F1F8D4;
+  --quartile-50: #EBE0F5;
+  --sun-50:      #FFF3D1;
+  --coral-50:    #FFE2D9;
+  --plum-50:     #EBE0F5;
+
+  /* Neutrals */
+  --ink:    #0D0A2C;   /* primary text + outlines */
+  --ash:    #5A5670;   /* dim text */
+  --bone:   #EFEBDC;   /* hairline surfaces */
+  --paper:  #FDFCF7;   /* default bg */
+  --cream:  #FFF1D6;   /* callout bg */
+  --white:  #FFFFFF;
+
+  /* ---------- SEMANTIC ---------- */
+  --fg-1: var(--ink);
+  --fg-2: var(--ash);
+  --fg-inv: var(--paper);
+
+  --bg-1: var(--paper);
+  --bg-2: var(--cream);
+  --bg-flood-mean:   var(--mean);
+  --bg-flood-median: var(--median);
+  --bg-flood-mode:   var(--mode);
+
+  --border: var(--ink);
+  --border-soft: rgba(13, 10, 44, 0.12);
+
+  --link: var(--median);
+  --success: var(--mode);
+  --warning: var(--sun);
+  --danger: var(--coral);
+
+  /* ---------- TYPOGRAPHY ---------- */
+  --font-hero:    'Bagel Fat One', 'Unbounded', system-ui, sans-serif; /* ultra-chunky, hero only */
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-hand:    'Caveat', cursive;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --fs-hero:   clamp(56px, 8vw, 128px);
+  --fs-h1:     clamp(40px, 5vw, 64px);
+  --fs-h2:     clamp(28px, 3.5vw, 40px);
+  --fs-h3:     24px;
+  --fs-h4:     20px;
+  --fs-body:   18px;
+  --fs-small:  14px;
+  --fs-micro:  12px;
+
+  --lh-tight:  0.95;
+  --lh-snug:   1.15;
+  --lh-body:   1.5;
+
+  --tracking-display: -0.02em;
+  --tracking-body:    0;
+  --tracking-caps:    0.06em;
+
+  /* ---------- SPACING ---------- */
+  --s-1:   4px;
+  --s-2:   8px;
+  --s-3:   12px;
+  --s-4:   16px;
+  --s-5:   24px;
+  --s-6:   32px;
+  --s-7:   48px;
+  --s-8:   64px;
+  --s-9:   96px;
+  --s-10:  128px;
+
+  /* ---------- RADII ---------- */
+  --r-sm:   8px;
+  --r-md:   16px;
+  --r-lg:   24px;
+  --r-xl:   32px;
+  --r-pill: 999px;
+
+  /* ---------- BORDERS ---------- */
+  --bw:     2.5px;     /* signature chunky border */
+  --bw-thin: 1.5px;
+
+  /* ---------- SHADOWS ---------- */
+  /* Signature offset "sticker" shadow */
+  --sh-1:  3px 3px 0 var(--ink);
+  --sh-2:  6px 6px 0 var(--ink);
+  --sh-3:  8px 8px 0 var(--ink);
+  --sh-4:  12px 12px 0 var(--ink);
+  /* Soft (modals / toasts only) */
+  --sh-soft: 0 12px 32px rgba(13, 10, 44, 0.12);
+
+  /* ---------- MOTION ---------- */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in:     cubic-bezier(0.6, 0, 0.8, 0.2);
+
+  --dur-micro:  120ms;
+  --dur-std:    240ms;
+  --dur-big:    480ms;
+
+  /* ---------- LAYOUT ---------- */
+  --maxw-text:    880px;
+  --maxw-page:   1200px;
+  --maxw-wide:   1440px;
+  --nav-h:         72px;
+}
+
+/* ============================================================
+   Base styles (use these or apply individual tokens)
+   ============================================================ */
+
+html, body {
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display headings */
+h1, .h1, h2, .h2, h3, .h3, h4, .h4, .hero {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--lh-tight);
+  color: var(--fg-1);
+  margin: 0;
+}
+
+.hero { font-family: var(--font-hero); font-size: var(--fs-hero); font-weight: 400; letter-spacing: -0.02em; }
+h1, .h1 { font-size: var(--fs-h1); }
+h2, .h2 { font-size: var(--fs-h2); line-height: var(--lh-snug); }
+h3, .h3 { font-size: var(--fs-h3); line-height: var(--lh-snug); }
+h4, .h4 { font-size: var(--fs-h4); line-height: var(--lh-snug); font-weight: 700; }
+
+p { margin: 0 0 var(--s-4); max-width: 64ch; }
+
+.hand   { font-family: var(--font-hand); font-weight: 700; }
+.mono   { font-family: var(--font-mono); }
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+a { color: var(--link); text-decoration: none; font-weight: 500; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+code, pre, kbd {
+  font-family: var(--font-mono);
+  background: var(--bone);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+}
+
+/* Signature card */
+.mmm-card {
+  background: var(--bg-1);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-2);
+  padding: var(--s-5);
+}
+
+/* Signature button */
+.mmm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  padding: 14px 28px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--median);
+  color: var(--paper);
+  box-shadow: var(--sh-2);
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-bounce),
+              box-shadow var(--dur-micro) var(--ease-bounce);
+}
+.mmm-btn:hover  { transform: translate(-1px, -2px); box-shadow: var(--sh-3); }
+.mmm-btn:active { transform: translate(2px, 2px);  box-shadow: var(--sh-1); }
+.mmm-btn:focus-visible { outline: 3px solid var(--median); outline-offset: 3px; }
+
+.mmm-btn--mean   { background: var(--mean); }
+.mmm-btn--mode   { background: var(--mode); color: var(--ink); }
+.mmm-btn--ghost  { background: var(--paper); color: var(--ink); }
+
+/* Inputs */
+.mmm-input {
+  font-family: var(--font-body);
+  font-size: 18px;
+  padding: 14px 18px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--sh-1);
+  transition: box-shadow var(--dur-micro) var(--ease-bounce);
+}
+.mmm-input:focus { outline: none; box-shadow: var(--sh-2); }
+
+/* Decorative grid background */
+.mmm-grid-bg {
+  background-image:
+    linear-gradient(rgba(13,10,44,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13,10,44,0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
