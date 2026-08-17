@@ -31,30 +31,35 @@ Multi-strategy automated trading robot for MetaTrader 5, with a local web dashbo
 
 ```
 app.py                     Flask API + engine thread lifecycle (entry point: python app.py)
+conftest.py                Puts src/ on the path for pytest
 
-core/                       Trading engine and execution primitives
-  engine.py                  Trading loop: strategy signal -> risk manager -> execution
-  mt5_bridge.py               MetaTrader5 package wrapper
-  risk_manager.py             Lot sizing, exposure caps, daily loss, drawdown kill-switch
-  config.py                   Default settings, state
+src/                        All Python packages live here
+  core/                       Trading engine and execution primitives
+    engine.py                  Trading loop: strategy signal -> risk manager -> execution
+    mt5_bridge.py               MetaTrader5 package wrapper
+    risk_manager.py             Lot sizing, exposure caps, daily loss, drawdown kill-switch
+    config.py                   Default settings, state
 
-strategies/                 One module per strategy, common get_signal() interface
-  trend.py, scalping.py, smc.py, grid.py, pivot_breakout.py
+  strategies/                 One module per strategy, common get_signal() interface
+    trend.py, scalping.py, smc.py, grid.py, pivot_breakout.py
 
-analysis/                   Data analysis and simulation
-  indicators.py               MA/RSI/ATR/MACD/Bollinger Bands/Pivots/swing detection
-  analytics.py                Win rate / profit factor / equity curve / streak stats
-  backtest.py                 Bar-by-bar backtest simulator
+  analysis/                   Data analysis and simulation
+    indicators.py               MA/RSI/ATR/MACD/Bollinger Bands/Pivots/swing detection
+    analytics.py                Win rate / profit factor / equity curve / streak stats
+    backtest.py                 Bar-by-bar backtest simulator
 
-automation/                 Background automation independent of any one strategy
-  trailing_manager.py         Trailing-stop / break-even automation
-  alerts.py                   Price / margin alert evaluation
-  journal.py                  Per-ticket trade notes
-  news_filter.py              Manual blackout-window filter
+  automation/                 Background automation independent of any one strategy
+    trailing_manager.py         Trailing-stop / break-even automation
+    alerts.py                   Price / margin alert evaluation
+    journal.py                  Per-ticket trade notes
+    news_filter.py              Manual blackout-window filter
 
 static/dashboard.html       Web dashboard (single file, no build step)
-tests/                       Mirrors the source layout (tests/core, tests/analysis, ...)
+mql5/                        Optional read-only on-chart status panel (MQL5 EA)
+tests/                       Mirrors src/'s layout (tests/core, tests/analysis, ...)
 ```
+
+Imports throughout the codebase stay as `import core.x`, `import analysis.x`, etc. — `app.py` and `conftest.py` each add `src/` to `sys.path` at the top, so nothing under `src/` needs a `src.` prefix.
 
 Design docs and implementation plans for each build phase are in `docs/superpowers/`.
 

@@ -185,7 +185,7 @@ Save multiple MT5 login profiles (name, terminal path, login, password, server) 
 | **Trend** | MA crossover + RSI filter | Trending markets, higher timeframes |
 | **Scalping** | Fast M1 entries, ATR-based SL/TP, spread filter | Very active trading, needs tight spreads |
 | **SMC** | Break-of-structure / order block detection | Traders familiar with smart-money concepts |
-| **Grid** | Laddered pending orders, hardcoded safety caps | Ranging markets — **highest risk mode**, understand the caps in `strategies/grid.py` before using |
+| **Grid** | Laddered pending orders, hardcoded safety caps | Ranging markets — **highest risk mode**, understand the caps in `src/strategies/grid.py` before using |
 | **Pivot breakout** | Daily/weekly pivot breakout with optional retest | Breakout trading around session opens |
 | **Ensemble** | Votes across Trend/Scalping/SMC/Pivot Breakout | Wanting fewer, higher-conviction signals |
 
@@ -230,7 +230,7 @@ Check its settings tab — thresholds may be too strict for current market condi
 Intentional. Trading never auto-resumes from a restart — you must explicitly re-arm it every time the app starts. This is a safety guarantee, not a bug.
 
 **Grid strategy won't let me change max levels/lots/equity stop**
-Also intentional — those caps are hardcoded in `strategies/grid.py`, not exposed to the UI or API, specifically so a misclick can't remove your safety net. Edit the source file directly if you understand the implications.
+Also intentional — those caps are hardcoded in `src/strategies/grid.py`, not exposed to the UI or API, specifically so a misclick can't remove your safety net. Edit the source file directly if you understand the implications.
 
 ## File/data reference
 
