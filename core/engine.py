@@ -2,12 +2,16 @@
 Flask-owned thread in app.py so the whole loop is testable without real threading/sleep."""
 import csv
 import os
+import time
 from datetime import datetime, timezone
 
 import automation.alerts as alerts
+import automation.execution_log as execution_log
 import automation.news_filter as news_filter
+import automation.swap_filter as swap_filter
 import core.correlation as correlation
 import core.htf_filter as htf_filter
+import core.portfolio_risk as portfolio_risk
 import core.risk_manager as rm
 import core.session_filter as session_filter
 import automation.trailing_manager as trailing_manager
@@ -34,7 +38,8 @@ def log_trade(row):
         writer.writerow(row)
 
 
-def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts):
+def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts, partial_closed_tickets=None):
+    partial_closed_tickets = partial_closed_tickets if partial_closed_tickets is not None else set()
     positions = bridge.get_open_positions()
     for pos in positions:
         if global_settings.get("trailing_enabled", False):
@@ -45,6 +50,12 @@ def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts):
                 bridge, pos,
                 global_settings.get("breakeven_trigger_points", 100),
                 global_settings.get("breakeven_offset_points", 10))
+        if global_settings.get("partial_tp_enabled", False):
+            trailing_manager.apply_partial_tp(
+                bridge, pos,
+                global_settings.get("partial_tp_trigger_points", 100),
+                global_settings.get("partial_tp_close_fraction", 0.5),
+                partial_closed_tickets)
 
     triggered = alerts.check_price_alerts(bridge, alert_rules)
     for rule in triggered:
@@ -80,6 +91,30 @@ def _passes_signal_filters(bridge, symbol, timeframe, signal, rates_df, global_s
     return True
 
 
+def _passes_risk_gates(bridge, global_settings, open_positions, equity):
+    if global_settings.get("swap_filter_enabled", False):
+        if swap_filter.is_swap_blackout(
+                datetime.now(timezone.utc),
+                global_settings.get("swap_block_hours_before_rollover", 1),
+                global_settings.get("swap_rollover_hour_utc", 21)):
+            return False
+
+    if global_settings.get("portfolio_risk_filter_enabled", False):
+        if not portfolio_risk.check_portfolio_risk_allowed(
+                open_positions, equity, global_settings.get("max_portfolio_risk_percent", 20.0)):
+            return False
+
+    return True
+
+
+def _place_order_logged(bridge, symbol, signal, lots, sl, tp, slippage_points):
+    start = time.monotonic()
+    ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp, slippage_points=slippage_points)
+    latency_ms = (time.monotonic() - start) * 1000
+    execution_log.log_execution(symbol, latency_ms, retcode, requoted=not ok)
+    return ok, retcode
+
+
 def _calc_confidence(bridge, symbol, entry, sl, tp, global_settings):
     confidence = 1.0
     if global_settings.get("confidence_sizing_enabled", False):
@@ -93,7 +128,7 @@ def _calc_confidence(bridge, symbol, entry, sl, tp, global_settings):
 
 
 def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percent, drawdown_percent,
-             alert_rules=None, triggered_alerts=None, blackout_windows=None):
+             alert_rules=None, triggered_alerts=None, blackout_windows=None, partial_closed_tickets=None):
     open_positions = bridge.get_open_positions(state["symbol"])
 
     if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
@@ -103,7 +138,7 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         return
 
     _manage_positions(bridge, global_settings, alert_rules if alert_rules is not None else [],
-                       triggered_alerts if triggered_alerts is not None else [])
+                       triggered_alerts if triggered_alerts is not None else [], partial_closed_tickets)
 
     strategy_name = state["active_strategy"]
     if strategy_name == "grid":
@@ -138,6 +173,10 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         return
 
     equity = bridge.get_account_equity()
+
+    if not _passes_risk_gates(bridge, global_settings, open_positions, equity):
+        return
+
     entry_price = bridge.get_rates(state["symbol"], state["timeframe"], 1)["close"].iloc[-1]
     sl_distance = abs(entry_price - sl)
     confidence = _calc_confidence(bridge, state["symbol"], entry_price, sl, tp, global_settings)
@@ -146,16 +185,14 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
     )
 
-    ok, retcode = bridge.place_order(
-        state["symbol"], signal, lots, sl=sl, tp=tp,
-        slippage_points=global_settings["slippage_points"],
-    )
+    ok, retcode = _place_order_logged(bridge, state["symbol"], signal, lots, sl, tp,
+                                       global_settings["slippage_points"])
     log_trade([datetime.now(timezone.utc).isoformat(), state["symbol"], strategy_name, signal, lots, sl, tp, retcode])
 
 
 def run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
                         daily_pnl_percent, drawdown_percent, alert_rules, triggered_alerts, manual_signals,
-                        blackout_windows=None):
+                        blackout_windows=None, partial_closed_tickets=None):
     for entry in watchlist:
         if not entry["enabled"]:
             continue
@@ -167,7 +204,7 @@ def run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
                        "ERROR", 0, None, None, str(exc)])
 
     _manage_positions(bridge, global_settings, alert_rules if alert_rules is not None else [],
-                       triggered_alerts if triggered_alerts is not None else [])
+                       triggered_alerts if triggered_alerts is not None else [], partial_closed_tickets)
 
 
 def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
@@ -204,6 +241,10 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
         return
 
     equity = bridge.get_account_equity()
+
+    if not _passes_risk_gates(bridge, global_settings, open_positions, equity):
+        return
+
     entry_price = bridge.get_rates(symbol, timeframe, 1)["close"].iloc[-1]
     sl_distance = abs(entry_price - sl)
     confidence = _calc_confidence(bridge, symbol, entry_price, sl, tp, global_settings)
@@ -211,6 +252,6 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
         equity=equity, risk_percent=global_settings["risk_percent"],
         sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
     )
-    ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp,
-                                      slippage_points=global_settings["slippage_points"])
+    ok, retcode = _place_order_logged(bridge, symbol, signal, lots, sl, tp,
+                                       global_settings["slippage_points"])
     log_trade([datetime.now(timezone.utc).isoformat(), symbol, strategy_name, signal, lots, sl, tp, retcode])

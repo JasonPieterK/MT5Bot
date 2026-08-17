@@ -63,6 +63,14 @@ GLOBAL_SETTINGS = {
     "session_filter_enabled": False,
     "session_start_hour": 0,
     "session_end_hour": 23,
+    "partial_tp_enabled": False,
+    "partial_tp_trigger_points": 100,
+    "partial_tp_close_fraction": 0.5,
+    "portfolio_risk_filter_enabled": False,
+    "max_portfolio_risk_percent": 20.0,
+    "swap_filter_enabled": False,
+    "swap_block_hours_before_rollover": 1,
+    "swap_rollover_hour_utc": 21,
 }
 
 

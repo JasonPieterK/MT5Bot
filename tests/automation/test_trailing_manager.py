@@ -59,3 +59,38 @@ def test_apply_breakeven_does_not_trigger_before_threshold():
     moved = tm.apply_breakeven(bridge, pos, trigger_points=100, offset_points=10)
     assert moved is False
     bridge.modify_position.assert_not_called()
+
+
+def test_apply_partial_tp_closes_fraction_and_moves_sl_to_be():
+    bridge = MagicMock()
+    bridge.get_current_price.return_value = (1.1105, 1.1107)
+    pos = buy_position(sl=1.0950)
+    pos["volume"] = 0.2
+    closed_tickets = set()
+    result = tm.apply_partial_tp(bridge, pos, trigger_points=100, close_fraction=0.5,
+                                  partial_closed_tickets=closed_tickets)
+    assert result is True
+    bridge.close_position.assert_called_once_with(1, "EURUSD", 0.1, "BUY", slippage_points=20)
+    bridge.modify_position.assert_called_once_with(1, 1.1000, 1.1200)
+    assert 1 in closed_tickets
+
+
+def test_apply_partial_tp_does_not_trigger_before_threshold():
+    bridge = MagicMock()
+    bridge.get_current_price.return_value = (1.1005, 1.1007)
+    pos = buy_position(sl=1.0950)
+    result = tm.apply_partial_tp(bridge, pos, trigger_points=100, close_fraction=0.5,
+                                  partial_closed_tickets=set())
+    assert result is False
+    bridge.close_position.assert_not_called()
+
+
+def test_apply_partial_tp_does_not_refire_same_ticket():
+    bridge = MagicMock()
+    bridge.get_current_price.return_value = (1.1105, 1.1107)
+    pos = buy_position(sl=1.0950)
+    closed_tickets = {1}
+    result = tm.apply_partial_tp(bridge, pos, trigger_points=100, close_fraction=0.5,
+                                  partial_closed_tickets=closed_tickets)
+    assert result is False
+    bridge.close_position.assert_not_called()
