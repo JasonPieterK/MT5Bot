@@ -21,3 +21,11 @@ def test_state_defaults():
     assert state["symbol"] == "EURUSD"
     assert state["timeframe"] == "M5"
     assert state["auto_enabled"] is False
+
+def test_state_has_watchlist_enabled_false_by_default():
+    assert config.new_state()["watchlist_enabled"] is False
+
+def test_new_watchlist_entry_shape():
+    entry = config.new_watchlist_entry(1, "EURUSD", "M5", "trend", "auto")
+    assert entry == {"id": 1, "symbol": "EURUSD", "timeframe": "M5",
+                      "strategy": "trend", "mode": "auto", "enabled": True}

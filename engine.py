@@ -101,3 +101,56 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         slippage_points=global_settings["slippage_points"],
     )
     log_trade([datetime.now(timezone.utc).isoformat(), state["symbol"], strategy_name, signal, lots, sl, tp, retcode])
+
+
+def run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                        daily_pnl_percent, drawdown_percent, alert_rules, triggered_alerts, manual_signals):
+    for entry in watchlist:
+        if not entry["enabled"]:
+            continue
+        try:
+            _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
+                                  daily_pnl_percent, drawdown_percent, manual_signals)
+        except Exception as exc:
+            log_trade([datetime.now(timezone.utc).isoformat(), entry["symbol"], entry["strategy"],
+                       "ERROR", 0, None, None, str(exc)])
+
+    _manage_positions(bridge, global_settings, alert_rules if alert_rules is not None else [],
+                       triggered_alerts if triggered_alerts is not None else [])
+
+
+def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
+                          daily_pnl_percent, drawdown_percent, manual_signals):
+    symbol, timeframe, strategy_name = entry["symbol"], entry["timeframe"], entry["strategy"]
+    module = STRATEGY_MODULES[strategy_name]
+    rates = bridge.get_rates(symbol, timeframe, 100)
+    signal, sl, tp = module.get_signal(rates, strategy_settings[strategy_name])
+
+    if signal == "NONE":
+        return
+
+    if entry["mode"] == "alert_only":
+        manual_signals.append({"symbol": symbol, "strategy": strategy_name, "signal": signal, "sl": sl, "tp": tp})
+        return
+
+    open_positions = bridge.get_open_positions()
+    allowed, reason = rm.check_trade_allowed(
+        open_position_count=len(open_positions),
+        max_concurrent_trades=global_settings["max_concurrent_trades"],
+        daily_pnl_percent=daily_pnl_percent,
+        daily_loss_limit_percent=global_settings["daily_loss_limit_percent"],
+        drawdown_percent=drawdown_percent,
+        max_drawdown_percent=global_settings["max_drawdown_percent"],
+    )
+    if not allowed:
+        return
+
+    equity = bridge.get_account_equity()
+    sl_distance = abs(bridge.get_rates(symbol, timeframe, 1)["close"].iloc[-1] - sl)
+    lots = rm.calc_lot_size(
+        equity=equity, risk_percent=global_settings["risk_percent"],
+        sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001,
+    )
+    ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp,
+                                      slippage_points=global_settings["slippage_points"])
+    log_trade([datetime.now(timezone.utc).isoformat(), symbol, strategy_name, signal, lots, sl, tp, retcode])

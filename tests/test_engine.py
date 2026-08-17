@@ -124,3 +124,80 @@ def test_manage_positions_triggers_margin_alert():
     engine._manage_positions(bridge, global_settings, [], triggered)
 
     assert any(t.get("type") == "margin" for t in triggered)
+
+
+def test_watchlist_auto_entry_places_order():
+    bridge = MagicMock()
+    bridge.get_rates.return_value = make_uptrend_rates()
+    bridge.get_open_positions.return_value = []
+    bridge.get_account_equity.return_value = 10000
+    bridge.get_margin_level.return_value = 500.0
+    bridge.place_order.return_value = (True, 10009)
+    watchlist = [{"id": 1, "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend",
+                  "mode": "auto", "enabled": True}]
+    strategy_settings = {"trend": {"ma_type": "EMA", "fast_period": 9, "slow_period": 21,
+                                    "rsi_period": 14, "rsi_buy_below": 65, "rsi_sell_above": 35}}
+    global_settings = {"risk_percent": 1.0, "max_concurrent_trades": 3,
+                        "daily_loss_limit_percent": 5.0, "max_drawdown_percent": 15.0,
+                        "slippage_points": 20, "margin_alert_level_percent": 100.0}
+    manual_signals = []
+    engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                               0.0, 0.0, [], [], manual_signals)
+    assert bridge.place_order.called
+    assert manual_signals == []
+
+
+def test_watchlist_alert_only_entry_does_not_place_order():
+    bridge = MagicMock()
+    bridge.get_rates.return_value = make_uptrend_rates()
+    bridge.get_open_positions.return_value = []
+    bridge.get_margin_level.return_value = 500.0
+    watchlist = [{"id": 2, "symbol": "GBPUSD", "timeframe": "M5", "strategy": "trend",
+                  "mode": "alert_only", "enabled": True}]
+    strategy_settings = {"trend": {"ma_type": "EMA", "fast_period": 9, "slow_period": 21,
+                                    "rsi_period": 14, "rsi_buy_below": 65, "rsi_sell_above": 35}}
+    global_settings = {"max_concurrent_trades": 3, "daily_loss_limit_percent": 5.0,
+                        "max_drawdown_percent": 15.0, "margin_alert_level_percent": 100.0}
+    manual_signals = []
+    engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                               0.0, 0.0, [], [], manual_signals)
+    assert not bridge.place_order.called
+    assert len(manual_signals) == 1
+    assert manual_signals[0]["symbol"] == "GBPUSD"
+
+
+def test_watchlist_disabled_entry_skipped():
+    bridge = MagicMock()
+    bridge.get_margin_level.return_value = 500.0
+    watchlist = [{"id": 3, "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend",
+                  "mode": "auto", "enabled": False}]
+    manual_signals = []
+    engine.run_watchlist_once(bridge, watchlist, {"trend": {}}, {"margin_alert_level_percent": 100.0},
+                               0.0, 0.0, [], [], manual_signals)
+    assert not bridge.get_rates.called
+
+
+def test_watchlist_one_entry_error_does_not_stop_others():
+    bridge = MagicMock()
+    def get_rates_side_effect(symbol, tf, count):
+        if symbol == "EURUSD":
+            raise RuntimeError("boom")
+        return make_uptrend_rates()
+    bridge.get_rates.side_effect = get_rates_side_effect
+    bridge.get_open_positions.return_value = []
+    bridge.get_account_equity.return_value = 10000
+    bridge.get_margin_level.return_value = 500.0
+    bridge.place_order.return_value = (True, 10009)
+    watchlist = [
+        {"id": 1, "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend", "mode": "auto", "enabled": True},
+        {"id": 2, "symbol": "GBPUSD", "timeframe": "M5", "strategy": "trend", "mode": "auto", "enabled": True},
+    ]
+    strategy_settings = {"trend": {"ma_type": "EMA", "fast_period": 9, "slow_period": 21,
+                                    "rsi_period": 14, "rsi_buy_below": 65, "rsi_sell_above": 35}}
+    global_settings = {"risk_percent": 1.0, "max_concurrent_trades": 3,
+                        "daily_loss_limit_percent": 5.0, "max_drawdown_percent": 15.0,
+                        "slippage_points": 20, "margin_alert_level_percent": 100.0}
+    manual_signals = []
+    engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                               0.0, 0.0, [], [], manual_signals)
+    assert bridge.place_order.called

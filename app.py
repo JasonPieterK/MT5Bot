@@ -21,6 +21,9 @@ global_settings = copy.deepcopy(config.GLOBAL_SETTINGS)
 alert_rules = []
 triggered_alerts = []
 _next_alert_id = 1
+watchlist = []
+manual_signals = []
+_next_watchlist_id = 1
 
 _engine_thread = None
 _stop_flag = threading.Event()
@@ -43,6 +46,8 @@ def status():
         "timeframe": state["timeframe"],
         "auto_enabled": state["auto_enabled"],
         "triggered_alerts": triggered_alerts,
+        "watchlist": watchlist,
+        "manual_signals": manual_signals,
     })
 
 
@@ -169,11 +174,46 @@ def apply_all():
     return jsonify({"ok": True})
 
 
+@app.route("/api/watchlist", methods=["GET"])
+def get_watchlist():
+    return jsonify(watchlist)
+
+
+@app.route("/api/watchlist", methods=["POST"])
+def post_watchlist():
+    global _next_watchlist_id
+    data = request.get_json()
+    entry = config.new_watchlist_entry(_next_watchlist_id, data["symbol"], data["timeframe"],
+                                        data["strategy"], data["mode"])
+    _next_watchlist_id += 1
+    watchlist.append(entry)
+    return jsonify(entry)
+
+
+@app.route("/api/watchlist/<int:entry_id>", methods=["DELETE"])
+def delete_watchlist(entry_id):
+    watchlist[:] = [w for w in watchlist if w["id"] != entry_id]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/watchlist/<int:entry_id>/toggle", methods=["POST"])
+def toggle_watchlist(entry_id):
+    data = request.get_json()
+    for w in watchlist:
+        if w["id"] == entry_id:
+            w["enabled"] = bool(data["enabled"])
+    return jsonify({"ok": True})
+
+
 def _engine_loop():
     while not _stop_flag.is_set():
-        engine.run_once(bridge, state, strategy_settings, global_settings,
-                         daily_pnl_percent=0.0, drawdown_percent=0.0,
-                         alert_rules=alert_rules, triggered_alerts=triggered_alerts)
+        if state.get("watchlist_enabled", False):
+            engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                                       0.0, 0.0, alert_rules, triggered_alerts, manual_signals)
+        else:
+            engine.run_once(bridge, state, strategy_settings, global_settings,
+                             daily_pnl_percent=0.0, drawdown_percent=0.0,
+                             alert_rules=alert_rules, triggered_alerts=triggered_alerts)
         time.sleep(5)
 
 

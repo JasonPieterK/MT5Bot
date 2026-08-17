@@ -13,6 +13,8 @@ def client(monkeypatch):
                          "timeframe": "M5", "auto_enabled": False}
     app_module.alert_rules.clear()
     app_module.triggered_alerts.clear()
+    app_module.watchlist.clear()
+    app_module.manual_signals.clear()
     app_module.app.config["TESTING"] = True
     yield app_module.app.test_client()
     app_module._stop_flag.set()
@@ -110,3 +112,32 @@ def test_status_includes_triggered_alerts(client):
     app_module.triggered_alerts.append({"id": 1, "type": "price"})
     resp = client.get("/api/status")
     assert resp.get_json()["triggered_alerts"] == [{"id": 1, "type": "price"}]
+
+
+def test_watchlist_crud(client):
+    resp = client.post("/api/watchlist", json={"symbol": "GBPUSD", "timeframe": "M5",
+                                                 "strategy": "trend", "mode": "auto"})
+    assert resp.status_code == 200
+    entry = resp.get_json()
+    assert entry["enabled"] is True
+    list_resp = client.get("/api/watchlist")
+    assert len(list_resp.get_json()) == 1
+    del_resp = client.delete(f"/api/watchlist/{entry['id']}")
+    assert del_resp.status_code == 200
+    assert client.get("/api/watchlist").get_json() == []
+
+
+def test_watchlist_toggle_enabled(client):
+    entry = client.post("/api/watchlist", json={"symbol": "GBPUSD", "timeframe": "M5",
+                                                  "strategy": "trend", "mode": "auto"}).get_json()
+    resp = client.post(f"/api/watchlist/{entry['id']}/toggle", json={"enabled": False})
+    assert resp.status_code == 200
+    updated = client.get("/api/watchlist").get_json()[0]
+    assert updated["enabled"] is False
+
+
+def test_status_includes_watchlist_and_manual_signals(client):
+    resp = client.get("/api/status")
+    body = resp.get_json()
+    assert "watchlist" in body
+    assert "manual_signals" in body

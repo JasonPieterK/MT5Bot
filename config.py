@@ -62,4 +62,10 @@ def new_state():
         "symbol": "EURUSD",
         "timeframe": "M5",
         "auto_enabled": False,
+        "watchlist_enabled": False,
     }
+
+
+def new_watchlist_entry(entry_id, symbol, timeframe, strategy, mode):
+    return {"id": entry_id, "symbol": symbol, "timeframe": timeframe,
+            "strategy": strategy, "mode": mode, "enabled": True}
