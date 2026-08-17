@@ -47,6 +47,11 @@ def _load_persisted_state():
     if not saved:
         return
     state.update(saved.get("state", {}))
+    # Never resume live trading from a restart -- no engine thread exists yet at this
+    # point, so a persisted True here would show "live" in the UI while nothing is
+    # actually running. Trading must be re-armed explicitly every process start.
+    state["auto_enabled"] = False
+    state["watchlist_enabled"] = False
     strategy_settings.update(saved.get("strategy_settings", {}))
     global_settings.update(saved.get("global_settings", {}))
     watchlist[:] = saved.get("watchlist", [])

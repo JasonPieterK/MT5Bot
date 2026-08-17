@@ -330,3 +330,16 @@ def test_auto_tune_switches_strategy_when_enabled(client):
     assert body["switched_to"] == "scalping"
     assert app_module.state["active_strategy"] == "scalping"
     app_module.global_settings["auto_tune_enabled"] = False
+
+
+def test_load_persisted_state_never_resumes_live_trading(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.persistence, "STATE_PATH", str(tmp_path / "app_state.json"))
+    app_module.persistence.save_all({
+        "state": {"symbol": "GBPUSD", "auto_enabled": True, "watchlist_enabled": True},
+    })
+    app_module.state["auto_enabled"] = True
+    app_module.state["watchlist_enabled"] = True
+    app_module._load_persisted_state()
+    assert app_module.state["auto_enabled"] is False
+    assert app_module.state["watchlist_enabled"] is False
+    assert app_module.state["symbol"] == "GBPUSD"
