@@ -252,9 +252,11 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
     entry_price = bridge.get_rates(state["symbol"], state["timeframe"], 1)["close"].iloc[-1]
     sl_distance = abs(entry_price - sl)
     confidence = _calc_confidence(bridge, state["symbol"], entry_price, sl, tp, global_settings)
+    min_lot, max_lot, lot_step = bridge.get_symbol_volume_limits(state["symbol"])
     lots = rm.calc_lot_size(
         equity=equity, risk_percent=global_settings["risk_percent"],
         sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
+        lot_step=lot_step, min_lot=min_lot, max_lot=max_lot,
     )
 
     ok, retcode = _place_order_logged(bridge, state["symbol"], signal, lots, sl, tp,
@@ -321,9 +323,11 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
     entry_price = bridge.get_rates(symbol, timeframe, 1)["close"].iloc[-1]
     sl_distance = abs(entry_price - sl)
     confidence = _calc_confidence(bridge, symbol, entry_price, sl, tp, global_settings)
+    min_lot, max_lot, lot_step = bridge.get_symbol_volume_limits(symbol)
     lots = rm.calc_lot_size(
         equity=equity, risk_percent=global_settings["risk_percent"],
         sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
+        lot_step=lot_step, min_lot=min_lot, max_lot=max_lot,
     )
     ok, retcode = _place_order_logged(bridge, symbol, signal, lots, sl, tp,
                                        global_settings["slippage_points"], strategy_name, global_settings)

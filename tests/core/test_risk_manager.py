@@ -90,3 +90,16 @@ def test_streak_multiplier_shrinks_after_losses():
 def test_streak_multiplier_has_floor():
     mult = rm.calc_streak_multiplier([-5] * 20, floor=0.2)
     assert mult == 0.2
+
+
+def test_calc_lot_size_clamped_to_broker_max():
+    # huge equity + tiny sl distance would otherwise blow past any sane lot size
+    lots = rm.calc_lot_size(equity=5_000_000, risk_percent=1.0, sl_distance_price=0.00001,
+                             pip_value_per_lot=10, point=0.0001, max_lot=50.0)
+    assert lots == 50.0
+
+
+def test_calc_lot_size_default_max_lot_still_applies():
+    lots = rm.calc_lot_size(equity=5_000_000, risk_percent=1.0, sl_distance_price=0.00001,
+                             pip_value_per_lot=10, point=0.0001)
+    assert lots == 100.0

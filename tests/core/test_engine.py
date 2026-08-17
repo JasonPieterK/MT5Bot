@@ -22,6 +22,7 @@ def test_run_once_places_order_when_signal_and_risk_allow(monkeypatch):
     bridge.get_account_equity.return_value = 10000
     bridge.check_stops_valid.return_value = (True, "")
     bridge.place_order.return_value = (True, 10009)
+    bridge.get_symbol_volume_limits.return_value = (0.01, 100.0, 0.01)
     bridge.get_margin_level.return_value = 500.0
 
     state = {"active_strategy": "trend", "symbol": "EURUSD", "timeframe": "M5"}
@@ -133,6 +134,7 @@ def test_watchlist_auto_entry_places_order():
     bridge.get_account_equity.return_value = 10000
     bridge.get_margin_level.return_value = 500.0
     bridge.place_order.return_value = (True, 10009)
+    bridge.get_symbol_volume_limits.return_value = (0.01, 100.0, 0.01)
     watchlist = [{"id": 1, "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend",
                   "mode": "auto", "enabled": True}]
     strategy_settings = {"trend": {"ma_type": "EMA", "fast_period": 9, "slow_period": 21,
@@ -188,6 +190,7 @@ def test_watchlist_one_entry_error_does_not_stop_others():
     bridge.get_account_equity.return_value = 10000
     bridge.get_margin_level.return_value = 500.0
     bridge.place_order.return_value = (True, 10009)
+    bridge.get_symbol_volume_limits.return_value = (0.01, 100.0, 0.01)
     watchlist = [
         {"id": 1, "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend", "mode": "auto", "enabled": True},
         {"id": 2, "symbol": "GBPUSD", "timeframe": "M5", "strategy": "trend", "mode": "auto", "enabled": True},
@@ -233,6 +236,7 @@ def test_run_once_ensemble_strategy_places_order_on_agreement(monkeypatch):
     bridge.get_account_equity.return_value = 10000
     bridge.get_margin_level.return_value = 500.0
     bridge.place_order.return_value = (True, 10009)
+    bridge.get_symbol_volume_limits.return_value = (0.01, 100.0, 0.01)
 
     import core.ensemble as ensemble
     monkeypatch.setattr(engine.ensemble, "get_ensemble_signal",

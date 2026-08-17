@@ -21,10 +21,12 @@
   }
   .logo { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:900; font-size:20px; letter-spacing:-0.02em; color:var(--fg-1); }
   .logo img { display:block; border-radius:var(--r-sm); }
+  .nav-group { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .nav-group-label { color:var(--fg-2) !important; }
   .nav-controls { display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; }
-  .nav-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left: var(--s-2); }
+  .nav-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .nav-spacer { flex: 1 1 auto; }
-  .nav-danger-zone { display:flex; align-items:center; gap:8px; padding-left:var(--s-3); margin-left:var(--s-2); border-left: var(--bw-thin) solid var(--border-soft); }
+  .nav-danger-zone { display:flex; align-items:center; gap:8px; padding-left:var(--s-3); border-left: var(--bw-thin) solid var(--border-soft); }
 
   /* ---------- Chips (nav tabs / status) ---------- */
   .chip {
@@ -42,6 +44,7 @@
   .chip.status-live { background:var(--danger); color:var(--paper); animation: pulse-live 1.6s var(--ease-out) infinite; }
   .chip.danger { background:var(--danger); color:var(--paper); }
   .chip:disabled, .chip.is-loading { opacity:0.5; cursor:not-allowed; transform:none !important; }
+  select:disabled, input:disabled { opacity:0.4; cursor:not-allowed; }
   @keyframes pulse-live { 0%,100% { box-shadow:var(--sh-1); } 50% { box-shadow:0 0 0 6px rgba(255,107,74,0.25), var(--sh-1); } }
   .icon-btn { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border:var(--bw) solid var(--ink); border-radius:var(--r-pill); background:var(--bg-1); cursor:pointer; box-shadow:var(--sh-1); transition: transform var(--dur-micro) var(--ease-bounce); }
   .icon-btn:hover { transform: rotate(-8deg) scale(1.05); }
@@ -119,39 +122,47 @@
 <header class="mmm-nav">
   <div class="logo"><img src="/static/logo.svg" alt="" width="32" height="32">MT5 Bot.</div>
 
-  <div class="nav-controls">
-    <input id="symbolSelect" list="symbolList" value="EURUSD" style="width:110px;" autocomplete="off">
-    <datalist id="symbolList">
-      <option value="EURUSD"><option value="GBPUSD"><option value="XAUUSD"><option value="USDJPY">
-    </datalist>
-    <select id="tfSelect"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
-    <select id="strategySelect">
-      <option value="trend">Trend</option>
-      <option value="scalping">Scalping</option>
-      <option value="smc">SMC</option>
-      <option value="grid">Grid</option>
-      <option value="pivot_breakout">Pivot breakout</option>
-      <option value="ensemble">Ensemble (vote)</option>
-    </select>
+  <div class="nav-group">
+    <span class="eyebrow nav-group-label">Single-symbol trading</span>
+    <div class="nav-controls">
+      <input id="symbolSelect" list="symbolList" value="EURUSD" style="width:110px;" autocomplete="off">
+      <datalist id="symbolList">
+        <option value="EURUSD"><option value="GBPUSD"><option value="XAUUSD"><option value="USDJPY">
+      </datalist>
+      <select id="tfSelect" title="Chart timeframe the selected strategy analyzes"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
+      <select id="strategySelect" title="Strategy run by single-symbol Auto">
+        <option value="trend">Trend</option>
+        <option value="scalping">Scalping</option>
+        <option value="smc">SMC</option>
+        <option value="grid">Grid</option>
+        <option value="pivot_breakout">Pivot breakout</option>
+        <option value="ensemble">Ensemble (vote)</option>
+      </select>
+      <button id="autoBtn" class="chip status-off" title="Arms/disarms live auto-trading for the symbol+strategy selected here"><i class="ph-bold ph-power"></i>Auto: off</button>
+    </div>
   </div>
 
-  <button id="autoBtn" class="chip status-off"><i class="ph-bold ph-power"></i>Auto: off</button>
-
-  <div class="nav-tabs">
-    <button class="chip" id="navPositionMgr"><i class="ph-bold ph-sliders"></i>Position mgr</button>
-    <button class="chip" id="navAnalytics"><i class="ph-bold ph-chart-line-up"></i>Analytics</button>
-    <button class="chip" id="navAlerts"><i class="ph-bold ph-bell"></i>Alerts</button>
-    <button class="chip" id="navWatchlist"><i class="ph-bold ph-eye"></i>Watchlist</button>
-    <button class="chip" id="navBacktest"><i class="ph-bold ph-clock-counter-clockwise"></i>Backtest</button>
-    <button class="chip" id="navSignalFilters"><i class="ph-bold ph-funnel"></i>Signal filters</button>
-    <button class="chip" id="navAccounts"><i class="ph-bold ph-identification-card"></i>Accounts</button>
-    <button class="chip" id="navLogs"><i class="ph-bold ph-file-text"></i>Logs</button>
+  <div class="nav-group">
+    <span class="eyebrow nav-group-label">Views</span>
+    <div class="nav-tabs">
+    <button class="chip" id="navPositionMgr" title="Trailing stop / break-even / partial-TP automation, applies to every open position"><i class="ph-bold ph-sliders"></i>Position mgr</button>
+    <button class="chip" id="navAnalytics" title="Win rate, profit factor, equity curve, per-strategy breakdown"><i class="ph-bold ph-chart-line-up"></i>Analytics</button>
+    <button class="chip" id="navAlerts" title="Price/margin alerts and news blackout windows"><i class="ph-bold ph-bell"></i>Alerts</button>
+    <button class="chip" id="navWatchlist" title="Trade multiple symbols at once (overrides the single-symbol controls above when live)"><i class="ph-bold ph-eye"></i>Watchlist</button>
+    <button class="chip" id="navBacktest" title="Simulate a strategy against historical price data"><i class="ph-bold ph-clock-counter-clockwise"></i>Backtest</button>
+    <button class="chip" id="navSignalFilters" title="Optional filters that gate every strategy's entries (session, correlation, ML, etc.)"><i class="ph-bold ph-funnel"></i>Signal filters</button>
+    <button class="chip" id="navAccounts" title="Saved MT5 login profiles"><i class="ph-bold ph-identification-card"></i>Accounts</button>
+    <button class="chip" id="navLogs" title="Plain-English record of everything the bot has done"><i class="ph-bold ph-file-text"></i>Logs</button>
+    </div>
   </div>
 
   <div class="nav-spacer"></div>
 
-  <div class="nav-danger-zone">
-    <button class="chip danger" id="closeAllBtn"><i class="ph-bold ph-x-circle"></i>Close all</button>
+  <div class="nav-group">
+    <span class="eyebrow nav-group-label">Danger zone</span>
+    <div class="nav-danger-zone">
+      <button class="chip danger" id="closeAllBtn" title="Immediately market-closes every open position on the account"><i class="ph-bold ph-x-circle"></i>Close all</button>
+    </div>
   </div>
 
 </header>
@@ -169,7 +180,7 @@
     <h3><i class="ph-bold ph-slider-horizontal"></i>Strategy settings</h3>
     <div class="tabs" id="tabs"></div>
     <div class="settings-grid" id="settingsGrid"></div>
-    <div class="row-actions"><button class="mmm-btn sm" id="saveSettingsBtn"><i class="ph-bold ph-floppy-disk"></i>Save settings</button></div>
+    <div class="row-actions"><button class="mmm-btn sm" id="saveSettingsBtn" title="Apply these values to the strategy on its next tick, no restart needed"><i class="ph-bold ph-floppy-disk"></i>Save settings</button></div>
     <h4 class="sub"><i class="ph-bold ph-list-bullets"></i>Open positions</h4>
     <table>
       <thead><tr><th>Ticket</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Profit</th><th>Note</th></tr></thead>
@@ -208,15 +219,15 @@
         <input id="watchdogWebhook" placeholder="https://..." style="width:100%;"></div>
     </div>
     <div class="row-actions">
-      <button class="mmm-btn sm" id="savePositionMgrBtn"><i class="ph-bold ph-floppy-disk"></i>Save</button>
-      <button class="mmm-btn sm mmm-btn--mean" id="applyAllBtn"><i class="ph-bold ph-lightning"></i>Apply now to all positions</button>
-      <button class="mmm-btn sm mmm-btn--ghost" id="saveStateBtn"><i class="ph-bold ph-archive-box"></i>Save state now</button>
+      <button class="mmm-btn sm" id="savePositionMgrBtn" title="Save all Position Manager settings above"><i class="ph-bold ph-floppy-disk"></i>Save</button>
+      <button class="mmm-btn sm mmm-btn--mean" id="applyAllBtn" title="Run trailing/break-even/partial-TP immediately instead of waiting for the next tick"><i class="ph-bold ph-lightning"></i>Apply now to all positions</button>
+      <button class="mmm-btn sm mmm-btn--ghost" id="saveStateBtn" title="Force-save settings to disk now (also happens automatically every engine tick)"><i class="ph-bold ph-archive-box"></i>Save state now</button>
     </div>
     <h4 class="sub"><i class="ph-bold ph-lock-key"></i>Trading lock (local passcode, optional)</h4>
     <div class="row-actions">
       <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px;"><input type="checkbox" id="lockEnabled"> Enabled</label>
       <input id="lockPasscode" type="password" autocomplete="new-password" placeholder="passcode" style="width:140px;">
-      <button class="mmm-btn sm" id="saveLockBtn"><i class="ph-bold ph-floppy-disk"></i>Save</button>
+      <button class="mmm-btn sm" id="saveLockBtn" title="Save the trading lock passcode"><i class="ph-bold ph-floppy-disk"></i>Save</button>
     </div>
   </section>
 
@@ -240,7 +251,7 @@
       <input id="alertSymbol" placeholder="EURUSD" style="width:100px;">
       <select id="alertCondition"><option value="above">above</option><option value="below">below</option></select>
       <input id="alertPrice" placeholder="price" style="width:100px;">
-      <button class="mmm-btn sm" id="addAlertBtn"><i class="ph-bold ph-plus"></i>Add alert</button>
+      <button class="mmm-btn sm" id="addAlertBtn" title="Fires once when price crosses this level, then removes itself"><i class="ph-bold ph-plus"></i>Add alert</button>
     </div>
     <table><thead><tr><th>Symbol</th><th>Condition</th><th>Price</th><th></th></tr></thead>
       <tbody id="alertsBody"></tbody></table>
@@ -249,7 +260,7 @@
       <input id="boStart" placeholder="2026-09-05T12:25:00+00:00" style="width:220px;">
       <input id="boEnd" placeholder="2026-09-05T12:35:00+00:00" style="width:220px;">
       <input id="boLabel" placeholder="NFP" style="width:80px;">
-      <button class="mmm-btn sm" id="addBlackoutBtn"><i class="ph-bold ph-plus"></i>Add</button>
+      <button class="mmm-btn sm" id="addBlackoutBtn" title="Blocks new entries during this UTC time window (existing positions untouched)"><i class="ph-bold ph-plus"></i>Add</button>
     </div>
     <table><thead><tr><th>Start</th><th>End</th><th>Label</th><th></th></tr></thead>
       <tbody id="blackoutsBody"></tbody></table>
@@ -258,7 +269,7 @@
   <section class="mmm-card panel span2" id="watchlistPanel" style="display:none;">
     <h3><i class="ph-bold ph-eye"></i>Watchlist <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— multi-symbol</span></h3>
     <div class="row-actions">
-      <button class="chip status-off" id="wlModeBtn"><i class="ph-bold ph-power"></i>Watchlist mode: off</button>
+      <button class="chip status-off" id="wlModeBtn" title="Switches the engine to trade every enabled row below instead of the single symbol in the header"><i class="ph-bold ph-power"></i>Watchlist mode: off</button>
     </div>
     <div class="row-actions">
       <input id="wlSymbol" placeholder="GBPUSD" style="width:90px;">
@@ -268,7 +279,7 @@
         <option value="smc">SMC</option><option value="pivot_breakout">Pivot breakout</option>
       </select>
       <select id="wlMode"><option value="auto">auto</option><option value="alert_only">alert_only</option></select>
-      <button class="mmm-btn sm" id="addWlBtn"><i class="ph-bold ph-plus"></i>Add</button>
+      <button class="mmm-btn sm" id="addWlBtn" title="Add this symbol+strategy pair to the watchlist"><i class="ph-bold ph-plus"></i>Add</button>
     </div>
     <table><thead><tr><th>Symbol</th><th>TF</th><th>Strategy</th><th>Mode</th><th>Enabled</th><th></th></tr></thead>
       <tbody id="watchlistBody"></tbody></table>
@@ -288,14 +299,14 @@
       </select>
       <input id="btBars" placeholder="bars (e.g. 500)" value="500" style="width:110px;">
       <input id="btEquity" placeholder="initial equity" value="10000" style="width:110px;">
-      <button class="mmm-btn sm" id="runBacktestBtn"><i class="ph-bold ph-play"></i>Run</button>
+      <button class="mmm-btn sm" id="runBacktestBtn" title="Simulate this strategy bar-by-bar over the chosen history, no real orders placed"><i class="ph-bold ph-play"></i>Run</button>
     </div>
     <div class="stat"><span class="label">Win rate</span><span class="value" id="btWinRate">-</span></div>
     <div class="stat"><span class="label">Profit factor</span><span class="value" id="btProfitFactor">-</span></div>
     <div class="stat"><span class="label">Trades</span><span class="value" id="btTradeCount">-</span></div>
     <div class="stat"><span class="label">Current streak</span><span class="value" id="btStreak">-</span></div>
     <h4 class="sub" title="Sweeps fast/slow MA period combinations for the trend strategy"><i class="ph-bold ph-magic-wand"></i>Parameter sweep (trend: fast/slow period)</h4>
-    <div class="row-actions"><button class="mmm-btn sm" id="runSweepBtn"><i class="ph-bold ph-play"></i>Run sweep</button></div>
+    <div class="row-actions"><button class="mmm-btn sm" id="runSweepBtn" title="Backtests every fast/slow MA period combination and ranks by profit factor"><i class="ph-bold ph-play"></i>Run sweep</button></div>
     <table><thead><tr><th>Fast period</th><th>Slow period</th><th>Profit factor</th><th>Win rate</th></tr></thead>
       <tbody id="sweepBody"></tbody></table>
   </section>
@@ -309,7 +320,7 @@
       <input id="accLogin" placeholder="login" style="width:100px;">
       <input id="accPassword" type="password" autocomplete="new-password" placeholder="password" style="width:120px;">
       <input id="accServer" placeholder="server" style="width:120px;">
-      <button class="mmm-btn sm" id="addAccountBtn"><i class="ph-bold ph-plus"></i>Add</button>
+      <button class="mmm-btn sm" id="addAccountBtn" title="Save this login profile locally (password stored in plain state, local convenience only)"><i class="ph-bold ph-plus"></i>Add</button>
     </div>
     <table><thead><tr><th>Name</th><th>Server</th><th>Login</th><th></th></tr></thead>
       <tbody id="accountsBody"></tbody></table>
@@ -319,7 +330,7 @@
     <h3><i class="ph-bold ph-file-text"></i>Logs <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— plain-English record of everything the bot does</span></h3>
     <p class="hint">Also written to <code>logs/app.log</code> on disk — open it directly if the app itself won't start.</p>
     <div class="row-actions">
-      <button class="mmm-btn sm" id="refreshLogsBtn"><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
+      <button class="mmm-btn sm" id="refreshLogsBtn" title="Reload the log immediately (also auto-refreshes every 3s while this tab is open)"><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
       <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px;">
         <input type="checkbox" id="logsAutoRefresh" checked> Auto-refresh
       </label>
@@ -359,9 +370,9 @@
         <select id="sfAutoTuneEnabled"><option value="false">false</option><option value="true">true</option></select></div>
     </div>
     <div class="row-actions">
-      <button class="mmm-btn sm" id="saveSignalFiltersBtn"><i class="ph-bold ph-floppy-disk"></i>Save</button>
-      <button class="mmm-btn sm mmm-btn--mode" id="trainMlBtn"><i class="ph-bold ph-brain"></i>Train ML filter</button>
-      <button class="mmm-btn sm mmm-btn--ghost" id="runAutoTuneBtn"><i class="ph-bold ph-magic-wand"></i>Run auto-tune now</button>
+      <button class="mmm-btn sm" id="saveSignalFiltersBtn" title="Save all Signal Filter settings above"><i class="ph-bold ph-floppy-disk"></i>Save</button>
+      <button class="mmm-btn sm mmm-btn--mode" id="trainMlBtn" title="Trains the win-probability filter on your own closed trades (needs 10+ trades tagged with a strategy)"><i class="ph-bold ph-brain"></i>Train ML filter</button>
+      <button class="mmm-btn sm mmm-btn--ghost" id="runAutoTuneBtn" title="Flags underperforming strategies and suggests (or auto-switches to, if enabled above) the best performer"><i class="ph-bold ph-magic-wand"></i>Run auto-tune now</button>
     </div>
     <div id="autoTuneResult" style="font-size:13px; color:var(--fg-2); margin-top:10px; font-family:var(--font-body);"></div>
   </section>
@@ -516,16 +527,36 @@ async function refreshStatus() {
   const data = await res.json();
   document.getElementById("statEquity").textContent = data.equity.toFixed(2);
   document.getElementById("statPositions").textContent = data.positions.length;
-  document.getElementById("statStrategy").textContent = data.active_strategy;
-  document.getElementById("statSymbolTf").textContent = `${data.symbol} / ${data.timeframe}`;
+
+  const symbolSelect = document.getElementById("symbolSelect");
+  const tfSelect = document.getElementById("tfSelect");
+  const strategySelect = document.getElementById("strategySelect");
+  if (data.watchlist_enabled) {
+    document.getElementById("statStrategy").textContent = "— (Watchlist mode is live)";
+    document.getElementById("statSymbolTf").textContent = "See Watchlist tab";
+    [symbolSelect, tfSelect, strategySelect].forEach(el => { el.disabled = true; });
+    symbolSelect.title = tfSelect.title = strategySelect.title =
+      "Ignored while Watchlist mode is live — this controls single-symbol Auto only. Manage trading symbols in the Watchlist tab.";
+  } else {
+    document.getElementById("statStrategy").textContent = data.active_strategy;
+    document.getElementById("statSymbolTf").textContent = `${data.symbol} / ${data.timeframe}`;
+    [symbolSelect, tfSelect, strategySelect].forEach(el => { el.disabled = false; });
+    symbolSelect.title = "Symbol traded by single-symbol Auto (has no effect while Watchlist mode is live)";
+    tfSelect.title = "Timeframe for the selected strategy (has no effect while Watchlist mode is live)";
+    strategySelect.title = "Strategy run by single-symbol Auto (has no effect while Watchlist mode is live)";
+  }
   const btn = document.getElementById("autoBtn");
   btn.innerHTML = data.auto_enabled
     ? `<i class="ph-bold ph-lightning"></i>Auto: live`
     : `<i class="ph-bold ph-power"></i>Auto: off`;
   btn.className = "chip " + (data.auto_enabled ? "status-live" : "status-off");
-  document.getElementById("symbolSelect").value = data.symbol;
-  document.getElementById("tfSelect").value = data.timeframe;
-  document.getElementById("strategySelect").value = data.active_strategy;
+  btn.title = data.watchlist_enabled
+    ? "Single-symbol auto-trading is disabled while Watchlist mode is live"
+    : "Arms/disarms live auto-trading for the symbol+strategy selected above";
+  btn.disabled = data.watchlist_enabled && !data.auto_enabled;
+  symbolSelect.value = data.symbol;
+  tfSelect.value = data.timeframe;
+  strategySelect.value = data.active_strategy;
 
   const body = document.getElementById("positionsBody");
   body.innerHTML = "";

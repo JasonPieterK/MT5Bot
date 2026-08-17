@@ -170,3 +170,21 @@ def test_get_recent_ticks_empty_when_none(mt5_mock):
     bridge, fake = mt5_mock
     fake.copy_ticks_from.return_value = None
     assert bridge.get_recent_ticks("EURUSD") == []
+
+
+def test_get_symbol_volume_limits_returns_broker_values(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.symbol_info.return_value = types.SimpleNamespace(volume_min=0.01, volume_max=50.0, volume_step=0.01)
+    min_lot, max_lot, step = bridge.get_symbol_volume_limits("EURUSD")
+    assert min_lot == 0.01
+    assert max_lot == 50.0
+    assert step == 0.01
+
+
+def test_get_symbol_volume_limits_falls_back_when_symbol_unknown(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.symbol_info.return_value = None
+    min_lot, max_lot, step = bridge.get_symbol_volume_limits("BADSYMBOL")
+    assert min_lot == 0.01
+    assert max_lot == 100.0
+    assert step == 0.01

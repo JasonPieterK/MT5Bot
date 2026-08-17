@@ -127,6 +127,19 @@ def get_history_deals(from_date):
     ]
 
 
+def get_symbol_volume_limits(symbol):
+    """Broker-defined min/max lot size and step for this symbol. Falls back to
+    conservative defaults if the symbol info isn't available (e.g. bad symbol name),
+    so a lot-size calculation never has an unbounded max."""
+    info = mt5.symbol_info(symbol)
+    if info is None:
+        return 0.01, 100.0, 0.01
+    min_lot = info.volume_min or 0.01
+    max_lot = info.volume_max or 100.0
+    step = info.volume_step or 0.01
+    return min_lot, max_lot, step
+
+
 def get_recent_ticks(symbol, count=50):
     ticks = mt5.copy_ticks_from(symbol, datetime.now(), count, mt5.COPY_TICKS_ALL)
     if ticks is None or len(ticks) == 0:

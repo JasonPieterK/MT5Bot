@@ -2,7 +2,7 @@
 
 
 def calc_lot_size(equity, risk_percent, sl_distance_price, pip_value_per_lot, point,
-                   lot_step=0.01, min_lot=0.01, confidence=1.0):
+                   lot_step=0.01, min_lot=0.01, max_lot=100.0, confidence=1.0):
     risk_amount = equity * (risk_percent / 100) * confidence
     sl_distance_points = sl_distance_price / point
     sl_distance_pips = sl_distance_points / 10
@@ -11,7 +11,7 @@ def calc_lot_size(equity, risk_percent, sl_distance_price, pip_value_per_lot, po
     raw_lots = risk_amount / (sl_distance_pips * pip_value_per_lot)
     steps = int(raw_lots / lot_step + 1e-9)
     stepped = steps * lot_step
-    return max(round(stepped, 2), min_lot)
+    return min(max(round(stepped, 2), min_lot), max_lot)
 
 
 def calc_confidence(entry, sl, tp, min_confidence=0.5, max_confidence=1.5):
