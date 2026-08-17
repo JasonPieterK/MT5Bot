@@ -154,3 +154,19 @@ def test_connect_no_params_calls_bare_initialize(mt5_mock):
     fake.initialize.return_value = True
     bridge.connect()
     fake.initialize.assert_called_once_with()
+
+
+def test_get_recent_ticks_returns_bid_prices(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.COPY_TICKS_ALL = 1
+    fake.copy_ticks_from.return_value = [
+        {"bid": 1.1050}, {"bid": 1.1052}, {"bid": 1.1051},
+    ]
+    ticks = bridge.get_recent_ticks("EURUSD", count=3)
+    assert ticks == [1.1050, 1.1052, 1.1051]
+
+
+def test_get_recent_ticks_empty_when_none(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.copy_ticks_from.return_value = None
+    assert bridge.get_recent_ticks("EURUSD") == []

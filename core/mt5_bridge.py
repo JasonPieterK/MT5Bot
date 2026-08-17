@@ -125,3 +125,10 @@ def get_history_deals(from_date):
          "magic": getattr(d, "magic", 0)}
         for d in deals if d.entry == mt5.DEAL_ENTRY_OUT
     ]
+
+
+def get_recent_ticks(symbol, count=50):
+    ticks = mt5.copy_ticks_from(symbol, datetime.now(), count, mt5.COPY_TICKS_ALL)
+    if ticks is None or len(ticks) == 0:
+        return []
+    return [float(t["bid"]) for t in ticks]

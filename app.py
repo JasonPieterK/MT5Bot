@@ -7,11 +7,13 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import analysis.analytics as analytics
 import automation.alerts as alerts
+import automation.auto_tuner as auto_tuner
 import analysis.backtest as backtest
 import core.accounts as accounts
 import core.config as config
 import core.engine as engine
 import automation.journal as journal
+import core.ml_filter as ml_filter
 import core.mt5_bridge as mt5_bridge
 import core.persistence as persistence
 import automation.watchdog as watchdog
@@ -381,6 +383,46 @@ def connect_account(account_id):
 def save_state_endpoint():
     _save_persisted_state()
     return jsonify({"ok": True})
+
+
+@app.route("/api/ml/train", methods=["POST"])
+def train_ml_filter():
+    from datetime import datetime, timedelta
+    body = request.get_json(silent=True) or {}
+    days = int(body.get("days", 30))
+    from_date = datetime.now() - timedelta(days=days)
+    deals = bridge.get_history_deals(from_date)
+    magic_to_strategy = {v: k for k, v in analytics.STRATEGY_MAGIC.items()}
+    features, labels = [], []
+    for d in deals:
+        strategy = magic_to_strategy.get(d.get("magic"))
+        if strategy is None:
+            continue
+        deal_time = datetime.fromtimestamp(d["time"])
+        features.append(ml_filter.build_features(strategy, deal_time.hour, deal_time.weekday()))
+        labels.append(1 if d["profit"] > 0 else 0)
+    if len(features) < 10:
+        return jsonify({"ok": False, "error": "not enough labeled trades yet (need at least 10)"}), 400
+    weights = ml_filter.train(features, labels)
+    ml_filter.save_weights(weights)
+    return jsonify({"ok": True, "trained_on": len(features)})
+
+
+@app.route("/api/auto_tune/run", methods=["POST"])
+def run_auto_tune():
+    from datetime import datetime, timedelta
+    from_date = datetime.now() - timedelta(days=30)
+    deals = bridge.get_history_deals(from_date)
+    per_strategy = analytics.compute_per_strategy_stats(deals)
+    min_trades = global_settings.get("auto_tune_min_trades", 10)
+    min_pf = global_settings.get("auto_tune_min_profit_factor", 0.8)
+    disable = auto_tuner.suggest_strategy_disable(per_strategy, min_pf, min_trades)
+    best = auto_tuner.suggest_best_strategy(per_strategy, min_trades)
+    switched = False
+    if global_settings.get("auto_tune_enabled", False) and state["active_strategy"] in disable and best:
+        state["active_strategy"] = best
+        switched = True
+    return jsonify({"disable_suggested": disable, "best_strategy": best, "switched_to": best if switched else None})
 
 
 def _engine_loop():

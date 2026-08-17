@@ -13,10 +13,14 @@ import automation.news_filter as news_filter
 import automation.schedule_filter as schedule_filter
 import automation.swap_filter as swap_filter
 import core.correlation as correlation
+import core.ensemble as ensemble
 import core.htf_filter as htf_filter
+import core.ml_filter as ml_filter
 import core.portfolio_risk as portfolio_risk
 import core.risk_manager as rm
 import core.session_filter as session_filter
+import core.spread_quality as spread_quality
+import core.tick_momentum as tick_momentum
 import automation.trailing_manager as trailing_manager
 import automation.watchdog as watchdog
 import analysis.volatility_regime as volatility_regime
@@ -85,7 +89,29 @@ def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts, pa
         triggered_alerts.append({"id": "margin", "type": "margin", "message": "margin level below threshold"})
 
 
-def _passes_signal_filters(bridge, symbol, timeframe, signal, rates_df, global_settings, open_positions):
+def _passes_signal_filters(bridge, symbol, timeframe, signal, rates_df, global_settings, open_positions,
+                            strategy_name=None):
+    if global_settings.get("spread_quality_filter_enabled", False):
+        if not spread_quality.is_spread_acceptable(
+                rates_df, max_ratio=global_settings.get("spread_quality_max_ratio", 1.5)):
+            return False
+
+    if global_settings.get("tick_momentum_filter_enabled", False):
+        ticks = bridge.get_recent_ticks(symbol, count=global_settings.get("tick_momentum_count", 50))
+        score = tick_momentum.momentum_score(ticks)
+        if not tick_momentum.signal_matches_momentum(
+                signal, score, threshold=global_settings.get("tick_momentum_threshold", 0.2)):
+            return False
+
+    if global_settings.get("ml_filter_enabled", False) and strategy_name is not None:
+        weights = ml_filter.load_weights()
+        if weights is not None:
+            now = datetime.now(timezone.utc)
+            features = ml_filter.build_features(strategy_name, now.hour, now.weekday())
+            proba = ml_filter.predict_proba(weights, features)
+            if proba < global_settings.get("ml_filter_min_probability", 0.5):
+                return False
+
     if global_settings.get("session_filter_enabled", False):
         now_hour = datetime.now(timezone.utc).hour
         if not session_filter.in_session(now_hour, global_settings.get("session_start_hour", 0),
@@ -173,6 +199,10 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         signal, sl, tp = grid.get_signal(
             rates, strategy_settings["grid"], current_grid_levels=len(open_positions),
         )
+    elif strategy_name == "ensemble":
+        rates = bridge.get_rates(state["symbol"], state["timeframe"], 100)
+        signal, sl, tp, agreeing = ensemble.get_ensemble_signal(
+            rates, strategy_settings, min_agree=global_settings.get("ensemble_min_agree", 2))
     else:
         module = STRATEGY_MODULES[strategy_name]
         rates = bridge.get_rates(state["symbol"], state["timeframe"], 100)
@@ -185,7 +215,7 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         return
 
     if not _passes_signal_filters(bridge, state["symbol"], state["timeframe"], signal, rates,
-                                   global_settings, open_positions):
+                                   global_settings, open_positions, strategy_name):
         return
 
     allowed, reason = rm.check_trade_allowed(
@@ -253,7 +283,8 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
 
     open_positions = bridge.get_open_positions()
 
-    if not _passes_signal_filters(bridge, symbol, timeframe, signal, rates, global_settings, open_positions):
+    if not _passes_signal_filters(bridge, symbol, timeframe, signal, rates, global_settings, open_positions,
+                                   strategy_name):
         return
 
     allowed, reason = rm.check_trade_allowed(

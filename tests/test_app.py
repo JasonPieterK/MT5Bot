@@ -279,3 +279,54 @@ def test_backtest_sweep_endpoint(client):
     body = resp.get_json()
     assert len(body) == 2
     assert "params" in body[0]
+
+
+def test_ml_train_needs_enough_trades(client):
+    app_module.bridge.get_history_deals.return_value = [
+        {"ticket": 1, "symbol": "EURUSD", "profit": 10.0, "time": 1700000000, "magic": 1001},
+    ]
+    resp = client.post("/api/ml/train")
+    assert resp.status_code == 400
+
+
+def test_ml_train_succeeds_with_enough_trades(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.ml_filter, "WEIGHTS_PATH", str(tmp_path / "ml_weights.json"))
+    deals = [{"ticket": i, "symbol": "EURUSD", "profit": 10.0 if i % 2 == 0 else -5.0,
+              "time": 1700000000 + i * 1000, "magic": 1001} for i in range(12)]
+    app_module.bridge.get_history_deals.return_value = deals
+    resp = client.post("/api/ml/train")
+    assert resp.status_code == 200
+    assert resp.get_json()["trained_on"] == 12
+    assert app_module.ml_filter.load_weights() is not None
+
+
+def test_auto_tune_run_suggests_disable(client):
+    app_module.bridge.get_history_deals.return_value = [
+        {"ticket": i, "symbol": "EURUSD", "profit": -5.0, "time": 1700000000 + i, "magic": 1001}
+        for i in range(15)
+    ] + [
+        {"ticket": 100 + i, "symbol": "EURUSD", "profit": 10.0, "time": 1700000000 + i, "magic": 1002}
+        for i in range(15)
+    ]
+    resp = client.post("/api/auto_tune/run")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "trend" in body["disable_suggested"]
+    assert body["best_strategy"] == "scalping"
+
+
+def test_auto_tune_switches_strategy_when_enabled(client):
+    app_module.state["active_strategy"] = "trend"
+    app_module.global_settings["auto_tune_enabled"] = True
+    app_module.bridge.get_history_deals.return_value = [
+        {"ticket": i, "symbol": "EURUSD", "profit": -5.0, "time": 1700000000 + i, "magic": 1001}
+        for i in range(15)
+    ] + [
+        {"ticket": 100 + i, "symbol": "EURUSD", "profit": 10.0, "time": 1700000000 + i, "magic": 1002}
+        for i in range(15)
+    ]
+    resp = client.post("/api/auto_tune/run")
+    body = resp.get_json()
+    assert body["switched_to"] == "scalping"
+    assert app_module.state["active_strategy"] == "scalping"
+    app_module.global_settings["auto_tune_enabled"] = False

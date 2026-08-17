@@ -224,3 +224,27 @@ def test_run_once_skips_order_during_blackout():
                      daily_pnl_percent=0.0, drawdown_percent=0.0, blackout_windows=blackout_windows)
 
     assert not bridge.place_order.called
+
+
+def test_run_once_ensemble_strategy_places_order_on_agreement(monkeypatch):
+    bridge = MagicMock()
+    bridge.get_rates.return_value = make_uptrend_rates()
+    bridge.get_open_positions.return_value = []
+    bridge.get_account_equity.return_value = 10000
+    bridge.get_margin_level.return_value = 500.0
+    bridge.place_order.return_value = (True, 10009)
+
+    import core.ensemble as ensemble
+    monkeypatch.setattr(engine.ensemble, "get_ensemble_signal",
+                         lambda rates, settings, min_agree=2: ("BUY", 1.09, 1.11, ["trend", "scalping"]))
+
+    state = {"active_strategy": "ensemble", "symbol": "EURUSD", "timeframe": "M5"}
+    strategy_settings = {"trend": {}, "scalping": {}, "smc": {}, "pivot_breakout": {}}
+    global_settings = {"risk_percent": 1.0, "max_concurrent_trades": 3,
+                        "daily_loss_limit_percent": 5.0, "max_drawdown_percent": 15.0,
+                        "slippage_points": 20, "margin_alert_level_percent": 100.0}
+
+    engine.run_once(bridge, state, strategy_settings, global_settings,
+                     daily_pnl_percent=0.0, drawdown_percent=0.0)
+
+    assert bridge.place_order.called

@@ -45,6 +45,7 @@
     <option value="smc">SMC</option>
     <option value="grid">Grid</option>
     <option value="pivot_breakout">Pivot Breakout</option>
+    <option value="ensemble">Ensemble (vote)</option>
   </select>
   <button id="autoBtn" class="off">AUTO: OFF</button>
   <button id="closeAllBtn">Close All</button>
@@ -232,8 +233,23 @@
         <select id="sfConfEnabled"><option value="false">false</option><option value="true">true</option></select></div>
       <div class="field" title="Shrink position size after consecutive losses"><label>Streak (Anti-Martingale) Sizing Enabled</label>
         <select id="sfStreakEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field" title="Rejects entries when the bar-level spread is wide vs recent average"><label>Spread Quality Filter Enabled</label>
+        <select id="sfSpreadEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field" title="Requires last-N-tick direction to agree with the signal"><label>Tick Momentum Filter Enabled</label>
+        <select id="sfMomentumEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field" title="Filters signals below this trained win-probability"><label>ML Win-Probability Filter Enabled</label>
+        <select id="sfMlEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>ML Min Win Probability</label><input id="sfMlMinProb" value="0.5"></div>
+      <div class="field"><label>Ensemble Min Agree</label><input id="sfEnsembleMinAgree" value="2"></div>
+      <div class="field" title="Auto-disable strategies with poor live profit factor once enough trades exist"><label>Auto-Tune Enabled</label>
+        <select id="sfAutoTuneEnabled"><option value="false">false</option><option value="true">true</option></select></div>
     </div>
-    <div class="row-actions"><button id="saveSignalFiltersBtn">Save</button></div>
+    <div class="row-actions">
+      <button id="saveSignalFiltersBtn">Save</button>
+      <button id="trainMlBtn">Train ML Filter (from trade history)</button>
+      <button id="runAutoTuneBtn">Run Auto-Tune Now</button>
+    </div>
+    <div id="autoTuneResult" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
   </section>
 
   <div id="alertBanner" style="display:none; position:fixed; top:10px; right:10px; background:var(--red); color:#fff; padding:12px 16px; border-radius:8px;"></div>
@@ -353,9 +369,11 @@ document.getElementById("tfSelect").onchange = async (e) => {
 document.getElementById("strategySelect").onchange = async (e) => {
   await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ strategy: e.target.value }) });
-  currentTab = e.target.value;
-  renderTabs();
-  renderSettingsForm();
+  if (STRATEGIES.includes(e.target.value)) {
+    currentTab = e.target.value;
+    renderTabs();
+    renderSettingsForm();
+  }
   refreshStatus();
 };
 document.getElementById("autoBtn").onclick = async () => {
@@ -441,7 +459,25 @@ document.getElementById("saveSignalFiltersBtn").onclick = async () => {
       volatility_regime_filter_enabled: document.getElementById("sfVolEnabled").value === "true",
       confidence_sizing_enabled: document.getElementById("sfConfEnabled").value === "true",
       streak_sizing_enabled: document.getElementById("sfStreakEnabled").value === "true",
+      spread_quality_filter_enabled: document.getElementById("sfSpreadEnabled").value === "true",
+      tick_momentum_filter_enabled: document.getElementById("sfMomentumEnabled").value === "true",
+      ml_filter_enabled: document.getElementById("sfMlEnabled").value === "true",
+      ml_filter_min_probability: Number(document.getElementById("sfMlMinProb").value),
+      ensemble_min_agree: Number(document.getElementById("sfEnsembleMinAgree").value),
+      auto_tune_enabled: document.getElementById("sfAutoTuneEnabled").value === "true",
     }) });
+};
+document.getElementById("trainMlBtn").onclick = async () => {
+  const resp = await fetch("/api/ml/train", { method: "POST", headers: {"Content-Type":"application/json"}, body: "{}" });
+  const result = await resp.json();
+  alert(result.ok ? `Trained on ${result.trained_on} trades.` : `Failed: ${result.error}`);
+};
+document.getElementById("runAutoTuneBtn").onclick = async () => {
+  const resp = await fetch("/api/auto_tune/run", { method: "POST" });
+  const result = await resp.json();
+  document.getElementById("autoTuneResult").textContent =
+    `Suggested disable: ${result.disable_suggested.join(", ") || "none"} | Best strategy: ${result.best_strategy || "n/a"}` +
+    (result.switched_to ? ` | Switched active strategy to ${result.switched_to}` : "");
 };
 document.getElementById("navPositionMgr").onclick = () => { showPanel("positionMgrPanel"); };
 document.getElementById("navAnalytics").onclick = () => { showPanel("analyticsPanel"); loadAnalytics(); };

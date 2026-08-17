@@ -76,6 +76,17 @@ GLOBAL_SETTINGS = {
     "schedule_disable_hour_utc": 21,
     "watchdog_webhook_url": "",
     "trade_notify_enabled": False,
+    "ensemble_min_agree": 2,
+    "ml_filter_enabled": False,
+    "ml_filter_min_probability": 0.5,
+    "spread_quality_filter_enabled": False,
+    "spread_quality_max_ratio": 1.5,
+    "tick_momentum_filter_enabled": False,
+    "tick_momentum_count": 50,
+    "tick_momentum_threshold": 0.2,
+    "auto_tune_enabled": False,
+    "auto_tune_min_trades": 10,
+    "auto_tune_min_profit_factor": 0.8,
 }
 
 
