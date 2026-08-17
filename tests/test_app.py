@@ -343,3 +343,18 @@ def test_load_persisted_state_never_resumes_live_trading(tmp_path, monkeypatch):
     assert app_module.state["auto_enabled"] is False
     assert app_module.state["watchlist_enabled"] is False
     assert app_module.state["symbol"] == "GBPUSD"
+
+
+def test_sync_mt5_status_panel_writes_file(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.mt5_status_sync, "get_common_files_dir", lambda: str(tmp_path))
+    app_module.bridge.get_account_equity.return_value = 12345.6
+    app_module.bridge.get_open_positions.return_value = []
+    app_module._sync_mt5_status_panel()
+    path = tmp_path / app_module.mt5_status_sync.STATUS_FILENAME
+    assert path.exists()
+    assert "equity=12345.6" in path.read_text()
+
+
+def test_sync_mt5_status_panel_never_raises_on_bridge_error(client):
+    app_module.bridge.get_account_equity.side_effect = RuntimeError("disconnected")
+    app_module._sync_mt5_status_panel()  # must not raise

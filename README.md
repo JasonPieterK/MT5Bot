@@ -18,7 +18,8 @@ Multi-strategy automated trading robot for MetaTrader 5, with a local web dashbo
 - **Signal filters** (all opt-in): correlation-aware exposure cap, higher-timeframe bias filter, volatility-regime filter, generic session-hour filter, confidence/anti-martingale position sizing
 - **Risk/execution**: partial take-profit, portfolio-level risk gate, execution latency/requote logging, swap-rollover blackout filter
 - **Ops**: MT5 connection watchdog with webhook alerts, persistent app state across restarts, saved account profiles (switch logins), scheduled Friday-close flatten, structured JSON event log
-- **Per-strategy analytics breakdown**, equity curve chart, backtest parameter sweep, trade-open webhook notifications, dark/light theme + responsive layout
+- **Per-strategy analytics breakdown**, equity curve chart, backtest parameter sweep, trade-open webhook notifications
+- **On-chart status panel**: a read-only MQL5 EA mirrors live status (auto state, strategy, equity, open positions) directly on an MT5 chart — see [mql5/](mql5/)
 - **Ensemble mode**: trades only when a majority of the 4 directional strategies agree
 - **ML win-probability filter**: small logistic regression trained on your own closed-deal history (strategy/hour/weekday features — MT5 deal history has no sl/tp, so reward:risk isn't a usable feature and isn't fabricated)
 - **Microstructure filters**: spread-quality (bar-level spread vs recent average) and tick-momentum (direction bias of recent ticks)
@@ -37,6 +38,19 @@ install.bat
 ```
 
 Creates a virtualenv and installs `requirements.txt`.
+
+## On-chart status panel (optional)
+
+`mql5/MT5BotStatusPanel.mq5` is a small Expert Advisor that mirrors the app's status directly on an MT5 chart — auto/live state, active strategy, symbol/TF, equity, open positions, and how stale the data is. **It never places, modifies, or closes trades** — it only reads a status file the Python app writes every ~5s and draws labels. All trading logic stays in the Python app.
+
+Setup:
+1. In MT5: File → Open Data Folder → `MQL5/Experts/`. Copy `MT5BotStatusPanel.mq5` there.
+2. Open MetaEditor (F4 in MT5), open the file, compile (F7).
+3. In MT5's Navigator, drag `MT5BotStatusPanel` onto any chart (doesn't need to be the symbol you're trading).
+4. MT5 requires "Allow Algo Trading" enabled for *any* EA to run its timer — turn it on even though this EA never trades.
+5. With `app.py` running, the panel populates within a second or two. If it says "app not found", the Python app isn't running or hasn't written its first status snapshot yet.
+
+The two processes sync via a plain text file in MT5's shared Common Files folder (`%APPDATA%\MetaQuotes\Terminal\Common\Files\mt5_bot_status.txt`) — no HTTP, no WebRequest allowlist needed.
 
 ## Run
 

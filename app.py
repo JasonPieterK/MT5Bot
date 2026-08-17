@@ -15,6 +15,7 @@ import core.engine as engine
 import automation.journal as journal
 import core.ml_filter as ml_filter
 import core.mt5_bridge as mt5_bridge
+import core.mt5_status_sync as mt5_status_sync
 import core.persistence as persistence
 import automation.watchdog as watchdog
 
@@ -451,7 +452,17 @@ def _engine_loop():
                              blackout_windows=blackout_windows,
                              partial_closed_tickets=partial_closed_tickets)
         _save_persisted_state()
+        _sync_mt5_status_panel()
         time.sleep(5)
+
+
+def _sync_mt5_status_panel():
+    try:
+        equity = bridge.get_account_equity()
+        open_count = len(bridge.get_open_positions())
+        mt5_status_sync.write_status_file(mt5_status_sync.build_status(state, equity, open_count))
+    except Exception:
+        pass  # panel sync is best-effort -- never let it break the trading loop
 
 
 if __name__ == "__main__":
