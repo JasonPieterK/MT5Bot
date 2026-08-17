@@ -2,6 +2,8 @@
 
 Multi-strategy automated trading robot for MetaTrader 5, with a local web dashboard. Python + Flask + the `MetaTrader5` package — no MQL5 required.
 
+📖 **New here? Start with [GUIDE.md](GUIDE.md)** — full install and usage walkthrough, every dashboard tab explained.
+
 ## Features
 
 - **5 strategy modules**: Trend-following, Scalping, SMC (break of structure), Grid/Martingale (hardcoded safety caps), Pivot Breakout
