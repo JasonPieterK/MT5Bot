@@ -15,6 +15,10 @@ Multi-strategy automated trading robot for MetaTrader 5, with a local web dashbo
 - **News/session blackout filter**: manually defined time windows block new entries (e.g. NFP release)
 - **Trading lock**: optional local passcode gate on enabling auto-trading
 - **Confirmation dialogs** on Close All, Apply-to-All, and enabling auto-trading
+- **Signal filters** (all opt-in): correlation-aware exposure cap, higher-timeframe bias filter, volatility-regime filter, generic session-hour filter, confidence/anti-martingale position sizing
+- **Risk/execution**: partial take-profit, portfolio-level risk gate, execution latency/requote logging, swap-rollover blackout filter
+- **Ops**: MT5 connection watchdog with webhook alerts, persistent app state across restarts, saved account profiles (switch logins), scheduled Friday-close flatten, structured JSON event log
+- **Per-strategy analytics breakdown**, equity curve chart, backtest parameter sweep, trade-open webhook notifications, dark/light theme + responsive layout
 
 ## Requirements
 
