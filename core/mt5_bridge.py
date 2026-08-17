@@ -63,7 +63,7 @@ def check_stops_valid(symbol, sl, tp):
     return True, ""
 
 
-def place_order(symbol, direction, volume, sl, tp, slippage_points):
+def place_order(symbol, direction, volume, sl, tp, slippage_points, magic=0):
     tick = mt5.symbol_info_tick(symbol)
     order_type = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
     price = tick.ask if direction == "BUY" else tick.bid
@@ -76,6 +76,7 @@ def place_order(symbol, direction, volume, sl, tp, slippage_points):
         "sl": sl,
         "tp": tp,
         "deviation": slippage_points,
+        "magic": magic,
         "type_filling": mt5.ORDER_FILLING_IOC if hasattr(mt5, "ORDER_FILLING_IOC") else 0,
     }
     result = mt5.order_send(request)
@@ -120,6 +121,7 @@ def get_history_deals(from_date):
     if deals is None:
         return []
     return [
-        {"ticket": d.ticket, "symbol": d.symbol, "profit": d.profit, "time": d.time}
+        {"ticket": d.ticket, "symbol": d.symbol, "profit": d.profit, "time": d.time,
+         "magic": getattr(d, "magic", 0)}
         for d in deals if d.entry == mt5.DEAL_ENTRY_OUT
     ]

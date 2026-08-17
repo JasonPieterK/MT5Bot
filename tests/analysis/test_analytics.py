@@ -49,3 +49,21 @@ def test_current_streak_counts_trailing_losses_as_negative():
     ]
     stats = analytics.compute_stats(deals)
     assert stats["current_streak"] == -2
+
+
+def test_compute_per_strategy_stats_groups_by_magic():
+    deals = [
+        {"profit": 10.0, "magic": 1001, "symbol": "EURUSD", "time": 1},
+        {"profit": -5.0, "magic": 1001, "symbol": "EURUSD", "time": 2},
+        {"profit": 20.0, "magic": 1002, "symbol": "EURUSD", "time": 3},
+    ]
+    result = analytics.compute_per_strategy_stats(deals)
+    assert set(result.keys()) == {"trend", "scalping"}
+    assert result["trend"]["win_rate"] == 50.0
+    assert result["scalping"]["win_rate"] == 100.0
+
+
+def test_compute_per_strategy_stats_ignores_unknown_magic():
+    deals = [{"profit": 10.0, "magic": 9999, "symbol": "EURUSD", "time": 1}]
+    result = analytics.compute_per_strategy_stats(deals)
+    assert result == {}

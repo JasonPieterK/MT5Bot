@@ -5,6 +5,7 @@ import os
 import time
 from datetime import datetime, timezone
 
+import analysis.analytics as analytics
 import automation.alerts as alerts
 import automation.execution_log as execution_log
 import automation.json_logger as json_logger
@@ -17,6 +18,7 @@ import core.portfolio_risk as portfolio_risk
 import core.risk_manager as rm
 import core.session_filter as session_filter
 import automation.trailing_manager as trailing_manager
+import automation.watchdog as watchdog
 import analysis.volatility_regime as volatility_regime
 from strategies import trend, scalping, smc, grid, pivot_breakout
 
@@ -124,11 +126,19 @@ def _passes_risk_gates(bridge, global_settings, open_positions, equity):
     return True
 
 
-def _place_order_logged(bridge, symbol, signal, lots, sl, tp, slippage_points):
+def _place_order_logged(bridge, symbol, signal, lots, sl, tp, slippage_points, strategy_name, global_settings):
+    magic = analytics.STRATEGY_MAGIC.get(strategy_name, 0)
     start = time.monotonic()
-    ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp, slippage_points=slippage_points)
+    ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp,
+                                      slippage_points=slippage_points, magic=magic)
     latency_ms = (time.monotonic() - start) * 1000
     execution_log.log_execution(symbol, latency_ms, retcode, requoted=not ok)
+
+    if ok and global_settings.get("trade_notify_enabled", False):
+        watchdog.notify_webhook(
+            global_settings.get("watchdog_webhook_url", ""),
+            f"MT5 Bot: opened {signal} {lots} {symbol} ({strategy_name})")
+
     return ok, retcode
 
 
@@ -203,7 +213,7 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
     )
 
     ok, retcode = _place_order_logged(bridge, state["symbol"], signal, lots, sl, tp,
-                                       global_settings["slippage_points"])
+                                       global_settings["slippage_points"], strategy_name, global_settings)
     log_trade([datetime.now(timezone.utc).isoformat(), state["symbol"], strategy_name, signal, lots, sl, tp, retcode])
 
 
@@ -270,5 +280,5 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
         sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
     )
     ok, retcode = _place_order_logged(bridge, symbol, signal, lots, sl, tp,
-                                       global_settings["slippage_points"])
+                                       global_settings["slippage_points"], strategy_name, global_settings)
     log_trade([datetime.now(timezone.utc).isoformat(), symbol, strategy_name, signal, lots, sl, tp, retcode])

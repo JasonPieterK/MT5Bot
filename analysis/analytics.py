@@ -39,3 +39,25 @@ def compute_stats(deals):
         "equity_curve": curve,
         "current_streak": streak,
     }
+
+
+STRATEGY_MAGIC = {
+    "trend": 1001,
+    "scalping": 1002,
+    "smc": 1003,
+    "grid": 1004,
+    "pivot_breakout": 1005,
+}
+
+
+def compute_per_strategy_stats(deals):
+    """Groups deals by the magic number set on the order at open time (see
+    STRATEGY_MAGIC / mt5_bridge.place_order) and runs compute_stats per strategy."""
+    magic_to_strategy = {v: k for k, v in STRATEGY_MAGIC.items()}
+    grouped = {}
+    for deal in deals:
+        strategy = magic_to_strategy.get(deal.get("magic"))
+        if strategy is None:
+            continue
+        grouped.setdefault(strategy, []).append(deal)
+    return {strategy: compute_stats(strategy_deals) for strategy, strategy_deals in grouped.items()}

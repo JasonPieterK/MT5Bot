@@ -250,3 +250,32 @@ def test_save_state_endpoint(client, tmp_path, monkeypatch):
     resp = client.post("/api/state/save")
     assert resp.status_code == 200
     assert app_module.persistence.load_all() is not None
+
+
+def test_analytics_per_strategy_endpoint(client):
+    app_module.bridge.get_history_deals.return_value = [
+        {"ticket": 1, "symbol": "EURUSD", "profit": 10.0, "time": 1, "magic": 1001},
+        {"ticket": 2, "symbol": "EURUSD", "profit": 20.0, "time": 2, "magic": 1002},
+    ]
+    resp = client.get("/api/analytics/per_strategy")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) == {"trend", "scalping"}
+
+
+def test_backtest_sweep_endpoint(client):
+    import pandas as pd
+    price = 1.10
+    rows = []
+    for i in range(40):
+        price += 0.0008 if i % 2 == 0 else -0.0006
+        rows.append({"open": price, "high": price + 0.0005, "low": price - 0.0005, "close": price})
+    app_module.bridge.get_rates.return_value = pd.DataFrame(rows)
+    resp = client.post("/api/backtest/sweep", json={
+        "symbol": "EURUSD", "timeframe": "M5", "strategy": "trend", "bars": 40,
+        "initial_equity": 10000, "param_grid": {"fast_period": [5, 9]},
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body) == 2
+    assert "params" in body[0]

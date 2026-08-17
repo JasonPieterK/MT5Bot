@@ -4,32 +4,39 @@
 <meta charset="UTF-8">
 <title>MT5 Bot</title>
 <style>
-  :root { --bg:#0f1216; --panel:#171b21; --border:#262b33; --text:#e6e9ef; --muted:#8b93a1; --accent:#3ea6ff; --green:#3ecf6e; --red:#ff5c5c; }
+  :root { --bg:#0f1216; --panel:#171b21; --field:#1f242c; --border:#262b33; --text:#e6e9ef; --muted:#8b93a1; --accent:#3ea6ff; --green:#3ecf6e; --red:#ff5c5c; }
+  [data-theme="light"] { --bg:#f4f5f7; --panel:#ffffff; --field:#f0f1f4; --border:#dcdfe4; --text:#1a1d21; --muted:#6b7280; --accent:#2563eb; --green:#16a34a; --red:#dc2626; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
-  header { display:flex; align-items:center; gap:16px; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--border); }
+  header { display:flex; align-items:center; gap:16px; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap; }
   header h1 { font-size:16px; margin:0; }
-  select, input, button { background:#1f242c; color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 10px; }
+  select, input, button { background:var(--field); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 10px; }
   button { cursor:pointer; transition:background .15s; }
-  button:hover { background:#2a313c; }
+  button:hover { filter:brightness(1.15); }
   #autoBtn.on { background:var(--green); color:#04210f; }
   #autoBtn.off { background:var(--red); color:#2a0000; }
   main { display:grid; grid-template-columns: 260px 1fr; gap:16px; padding:16px; }
   .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
   .stat { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
   .tabs { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
-  .tab { padding:6px 10px; border-radius:6px; cursor:pointer; background:#1f242c; font-size:12px; }
+  .tab { padding:6px 10px; border-radius:6px; cursor:pointer; background:var(--field); font-size:12px; }
   .tab.active { background:var(--accent); color:#00101c; }
   .settings-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
   .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
   table { width:100%; border-collapse:collapse; font-size:12px; }
   th, td { text-align:left; padding:6px; border-bottom:1px solid var(--border); }
-  .row-actions { display:flex; gap:8px; margin-top:10px; }
+  .row-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; padding:10px; }
+    header { padding:10px; gap:8px; }
+    header h1 { width:100%; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>MT5 BOT</h1>
+  <button id="themeToggleBtn">Theme</button>
   <select id="symbolSelect"><option>EURUSD</option><option>GBPUSD</option><option>XAUUSD</option><option>USDJPY</option></select>
   <select id="tfSelect"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
   <select id="strategySelect">
@@ -116,6 +123,12 @@
     <div class="stat"><span>Win Rate</span><span id="statWinRate">-</span></div>
     <div class="stat"><span>Profit Factor</span><span id="statProfitFactor">-</span></div>
     <div class="stat"><span>Current Streak</span><span id="statStreak">-</span></div>
+    <div class="row-actions"><a id="exportCsvLink" href="/api/analytics/export">Export CSV</a></div>
+    <h3 style="margin-top:16px;">Equity Curve</h3>
+    <svg id="equityCurveSvg" width="100%" height="140" viewBox="0 0 600 140" preserveAspectRatio="none" style="background:var(--field); border-radius:6px;"></svg>
+    <h3 style="margin-top:16px;">Per-Strategy Breakdown</h3>
+    <table><thead><tr><th>Strategy</th><th>Win Rate</th><th>Profit Factor</th><th>Streak</th></tr></thead>
+      <tbody id="perStrategyBody"></tbody></table>
   </section>
 
   <section class="panel" id="alertsPanel" style="display:none; grid-column: span 2;">
@@ -178,6 +191,10 @@
     <div class="stat"><span>Profit Factor</span><span id="btProfitFactor">-</span></div>
     <div class="stat"><span>Trades</span><span id="btTradeCount">-</span></div>
     <div class="stat"><span>Current Streak</span><span id="btStreak">-</span></div>
+    <h3 style="margin-top:16px;" title="Sweeps fast/slow MA period combinations for the trend strategy">Parameter Sweep (trend: fast/slow period)</h3>
+    <div class="row-actions"><button id="runSweepBtn">Run Sweep</button></div>
+    <table><thead><tr><th>Fast Period</th><th>Slow Period</th><th>Profit Factor</th><th>Win Rate</th></tr></thead>
+      <tbody id="sweepBody"></tbody></table>
   </section>
 
   <section class="panel" id="accountsPanel" style="display:none; grid-column: span 2;">
@@ -579,7 +596,69 @@ async function loadAnalytics() {
   document.getElementById("statWinRate").textContent = data.win_rate + "%";
   document.getElementById("statProfitFactor").textContent = data.profit_factor;
   document.getElementById("statStreak").textContent = data.current_streak;
+  drawEquityCurve(data.equity_curve || []);
+
+  const perStrategyRes = await fetch("/api/analytics/per_strategy");
+  const perStrategy = await perStrategyRes.json();
+  const body = document.getElementById("perStrategyBody");
+  body.innerHTML = "";
+  Object.entries(perStrategy).forEach(([strategy, stats]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${strategy}</td><td>${stats.win_rate}%</td><td>${stats.profit_factor}</td><td>${stats.current_streak}</td>`;
+    body.appendChild(tr);
+  });
 }
+
+function drawEquityCurve(curve) {
+  const svg = document.getElementById("equityCurveSvg");
+  svg.innerHTML = "";
+  if (curve.length < 2) return;
+  const min = Math.min(...curve), max = Math.max(...curve);
+  const range = max - min || 1;
+  const points = curve.map((v, i) => {
+    const x = (i / (curve.length - 1)) * 600;
+    const y = 140 - ((v - min) / range) * 130 - 5;
+    return `${x},${y}`;
+  }).join(" ");
+  const style = getComputedStyle(document.documentElement);
+  const color = curve[curve.length - 1] >= curve[0] ? style.getPropertyValue("--green") : style.getPropertyValue("--red");
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  line.setAttribute("points", points);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width", "2");
+  svg.appendChild(line);
+}
+
+document.getElementById("runSweepBtn").onclick = async () => {
+  const res = await fetch("/api/backtest/sweep", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      symbol: document.getElementById("btSymbol").value || "EURUSD",
+      timeframe: document.getElementById("btTf").value,
+      strategy: "trend",
+      bars: Number(document.getElementById("btBars").value) || 500,
+      initial_equity: Number(document.getElementById("btEquity").value) || 10000,
+      param_grid: { fast_period: [5, 9, 13], slow_period: [21, 34, 50] },
+    }) });
+  const results = await res.json();
+  const body = document.getElementById("sweepBody");
+  body.innerHTML = "";
+  results.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.params.fast_period}</td><td>${r.params.slow_period}</td><td>${r.stats.profit_factor}</td><td>${r.stats.win_rate}%</td>`;
+    body.appendChild(tr);
+  });
+};
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("mt5bot-theme", theme);
+}
+document.getElementById("themeToggleBtn").onclick = () => {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(current === "dark" ? "light" : "dark");
+};
+applyTheme(localStorage.getItem("mt5bot-theme") || "dark");
 
 async function loadAlerts() {
   const res = await fetch("/api/alerts");

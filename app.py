@@ -215,6 +215,14 @@ def get_analytics():
     return jsonify(analytics.compute_stats(deals))
 
 
+@app.route("/api/analytics/per_strategy")
+def get_analytics_per_strategy():
+    from datetime import datetime, timedelta
+    from_date = datetime.now() - timedelta(days=30)
+    deals = bridge.get_history_deals(from_date)
+    return jsonify(analytics.compute_per_strategy_stats(deals))
+
+
 @app.route("/api/position_manager/apply_all", methods=["POST"])
 def apply_all():
     engine._manage_positions(bridge, global_settings, alert_rules, triggered_alerts, partial_closed_tickets)
@@ -283,6 +291,21 @@ def get_backtest():
     rates = bridge.get_rates(symbol, timeframe, bars)
     result = backtest.run_backtest(rates, strategy, strategy_settings[strategy], global_settings, initial_equity)
     return jsonify(result)
+
+
+@app.route("/api/backtest/sweep", methods=["POST"])
+def post_backtest_sweep():
+    data = request.get_json()
+    symbol = data.get("symbol", state["symbol"])
+    timeframe = data.get("timeframe", state["timeframe"])
+    strategy = data["strategy"]
+    bars = int(data.get("bars", 200))
+    initial_equity = float(data.get("initial_equity", 10000))
+    param_grid = data["param_grid"]
+    rates = bridge.get_rates(symbol, timeframe, bars)
+    results = backtest.run_sweep(rates, strategy, strategy_settings[strategy], param_grid,
+                                  global_settings, initial_equity)
+    return jsonify(results[:10])
 
 
 @app.route("/api/lock", methods=["POST"])

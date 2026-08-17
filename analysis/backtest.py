@@ -1,5 +1,7 @@
 """Bar-by-bar backtest simulator. Reuses live strategy modules and risk_manager so
 backtest and live logic never diverge. No spread/slippage modeled (documented gap)."""
+import itertools
+
 import analysis.analytics as analytics
 import core.risk_manager as rm
 from strategies import trend, scalping, smc, pivot_breakout
@@ -50,3 +52,18 @@ def run_backtest(rates_df, strategy_name, strategy_settings, global_settings, in
         open_trade = {"signal": signal, "entry": entry, "sl": sl, "tp": tp, "lots": lots}
 
     return {"deals": deals, "stats": analytics.compute_stats(deals)}
+
+
+def run_sweep(rates_df, strategy_name, base_settings, param_grid, global_settings, initial_equity):
+    """param_grid: {"fast_period": [5, 9, 13], "slow_period": [21, 34]} -> every combination
+    is run and results are sorted by profit_factor, best first."""
+    keys = list(param_grid.keys())
+    value_lists = [param_grid[k] for k in keys]
+    results = []
+    for combo in itertools.product(*value_lists):
+        settings = dict(base_settings)
+        settings.update(dict(zip(keys, combo)))
+        result = run_backtest(rates_df, strategy_name, settings, global_settings, initial_equity)
+        results.append({"params": dict(zip(keys, combo)), "stats": result["stats"]})
+    results.sort(key=lambda r: r["stats"]["profit_factor"], reverse=True)
+    return results

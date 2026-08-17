@@ -75,6 +75,7 @@ GLOBAL_SETTINGS = {
     "schedule_disable_weekday": 4,
     "schedule_disable_hour_utc": 21,
     "watchdog_webhook_url": "",
+    "trade_notify_enabled": False,
 }
 
 
