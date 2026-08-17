@@ -5,13 +5,13 @@ import time
 
 from flask import Flask, jsonify, request, send_from_directory
 
-import analytics
-import alerts
-import backtest
-import config
-import engine
-import journal
-import mt5_bridge
+import analysis.analytics as analytics
+import automation.alerts as alerts
+import analysis.backtest as backtest
+import core.config as config
+import core.engine as engine
+import automation.journal as journal
+import core.mt5_bridge as mt5_bridge
 
 app = Flask(__name__, static_folder="static")
 

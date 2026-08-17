@@ -1,4 +1,4 @@
-import config
+import core.config as config
 
 def test_default_strategy_settings_has_all_five():
     keys = set(config.DEFAULT_SETTINGS.keys())

@@ -1,7 +1,7 @@
 """Bar-by-bar backtest simulator. Reuses live strategy modules and risk_manager so
 backtest and live logic never diverge. No spread/slippage modeled (documented gap)."""
-import analytics
-import risk_manager as rm
+import analysis.analytics as analytics
+import core.risk_manager as rm
 from strategies import trend, scalping, smc, pivot_breakout
 
 STRATEGY_MODULES = {

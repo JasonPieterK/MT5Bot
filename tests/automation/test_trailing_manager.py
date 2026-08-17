@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-import trailing_manager as tm
+import automation.trailing_manager as tm
 
 
 def buy_position(sl=1.0950):

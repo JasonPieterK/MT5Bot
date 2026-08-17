@@ -1,6 +1,6 @@
 import pandas as pd
 from strategies.pivot_breakout import get_signal
-from config import DEFAULT_SETTINGS
+from core.config import DEFAULT_SETTINGS
 
 
 def make_df(closes, highs=None, lows=None):

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-import news_filter
+import automation.news_filter as news_filter
 
 
 def test_inside_window_is_blackout():

@@ -1,5 +1,5 @@
 import pandas as pd
-import indicators
+import analysis.indicators as indicators
 
 
 def make_series(values):

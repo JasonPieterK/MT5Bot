@@ -1,4 +1,4 @@
-import risk_manager as rm
+import core.risk_manager as rm
 
 
 def test_lot_size_from_risk_percent():

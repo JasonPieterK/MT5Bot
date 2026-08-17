@@ -1,4 +1,4 @@
-import analytics
+import analysis.analytics as analytics
 
 
 def test_empty_deals_returns_zeroed_stats():

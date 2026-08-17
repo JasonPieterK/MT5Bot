@@ -1,6 +1,6 @@
 import pandas as pd
 from unittest.mock import MagicMock
-import engine
+import core.engine as engine
 
 
 def make_uptrend_rates():

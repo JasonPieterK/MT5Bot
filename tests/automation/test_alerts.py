@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-import alerts
+import automation.alerts as alerts
 
 
 def test_price_alert_triggers_when_above_condition_met():

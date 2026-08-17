@@ -1,6 +1,6 @@
 import pandas as pd
 from strategies.grid import get_signal, HARD_MAX_LEVELS, HARD_MAX_TOTAL_LOTS, HARD_EQUITY_STOP_PERCENT
-from config import DEFAULT_SETTINGS
+from core.config import DEFAULT_SETTINGS
 
 
 def flat_df():

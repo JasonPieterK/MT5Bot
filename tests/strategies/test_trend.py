@@ -1,6 +1,6 @@
 import pandas as pd
 from strategies.trend import get_signal
-from config import DEFAULT_SETTINGS
+from core.config import DEFAULT_SETTINGS
 
 
 def uptrend_df():

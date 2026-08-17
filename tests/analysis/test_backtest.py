@@ -1,5 +1,5 @@
 import pandas as pd
-import backtest
+import analysis.backtest as backtest
 
 
 def make_rates():

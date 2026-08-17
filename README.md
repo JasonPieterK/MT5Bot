@@ -41,20 +41,30 @@ Opens the Flask server at `http://127.0.0.1:7500`. Open that URL in a browser fo
 ## Project Layout
 
 ```
-app.py                 Flask API + engine thread lifecycle
-engine.py               Trading loop: strategy signal -> risk manager -> execution
-mt5_bridge.py            MetaTrader5 package wrapper
-risk_manager.py          Lot sizing, exposure caps, daily loss, drawdown kill-switch
-indicators.py            MA/RSI/ATR/MACD/Bollinger Bands/Pivots/swing detection
-strategies/               One module per strategy, common get_signal() interface
-trailing_manager.py       Trailing-stop / break-even automation
-alerts.py                 Price / margin alert evaluation
-journal.py                Per-ticket trade notes
-analytics.py              Win rate / profit factor / equity curve / streak stats
-backtest.py               Bar-by-bar backtest simulator
-news_filter.py            Manual blackout-window filter
-config.py                 Default settings, state
-static/dashboard.html     Web dashboard (single file, no build step)
+app.py                     Flask API + engine thread lifecycle (entry point: python app.py)
+
+core/                       Trading engine and execution primitives
+  engine.py                  Trading loop: strategy signal -> risk manager -> execution
+  mt5_bridge.py               MetaTrader5 package wrapper
+  risk_manager.py             Lot sizing, exposure caps, daily loss, drawdown kill-switch
+  config.py                   Default settings, state
+
+strategies/                 One module per strategy, common get_signal() interface
+  trend.py, scalping.py, smc.py, grid.py, pivot_breakout.py
+
+analysis/                   Data analysis and simulation
+  indicators.py               MA/RSI/ATR/MACD/Bollinger Bands/Pivots/swing detection
+  analytics.py                Win rate / profit factor / equity curve / streak stats
+  backtest.py                 Bar-by-bar backtest simulator
+
+automation/                 Background automation independent of any one strategy
+  trailing_manager.py         Trailing-stop / break-even automation
+  alerts.py                   Price / margin alert evaluation
+  journal.py                  Per-ticket trade notes
+  news_filter.py              Manual blackout-window filter
+
+static/dashboard.html       Web dashboard (single file, no build step)
+tests/                       Mirrors the source layout (tests/core, tests/analysis, ...)
 ```
 
 Design docs and implementation plans for each build phase are in `docs/superpowers/`.

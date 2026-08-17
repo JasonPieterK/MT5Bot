@@ -1,4 +1,4 @@
-import indicators
+import analysis.indicators as indicators
 
 
 def get_signal(df, settings):

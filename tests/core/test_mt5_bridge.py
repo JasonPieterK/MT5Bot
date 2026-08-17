@@ -15,7 +15,7 @@ def mt5_mock(monkeypatch):
     fake.TRADE_RETCODE_DONE = 10009
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake)
     import importlib
-    import mt5_bridge
+    import core.mt5_bridge as mt5_bridge
     importlib.reload(mt5_bridge)
     return mt5_bridge, fake
 

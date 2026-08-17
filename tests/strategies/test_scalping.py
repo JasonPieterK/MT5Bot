@@ -1,6 +1,6 @@
 import pandas as pd
 from strategies.scalping import get_signal
-from config import DEFAULT_SETTINGS
+from core.config import DEFAULT_SETTINGS
 
 
 def bullish_body_df():

@@ -1,4 +1,4 @@
-import journal
+import automation.journal as journal
 
 
 def test_set_and_get_note_round_trip(tmp_path, monkeypatch):

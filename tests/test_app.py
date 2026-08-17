@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-import config
+import core.config as config
 import app as app_module
 
 

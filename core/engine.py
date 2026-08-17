@@ -4,10 +4,10 @@ import csv
 import os
 from datetime import datetime, timezone
 
-import alerts
-import news_filter
-import risk_manager as rm
-import trailing_manager
+import automation.alerts as alerts
+import automation.news_filter as news_filter
+import core.risk_manager as rm
+import automation.trailing_manager as trailing_manager
 from strategies import trend, scalping, smc, grid, pivot_breakout
 
 STRATEGY_MODULES = {
