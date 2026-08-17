@@ -11,6 +11,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import analysis.analytics as analytics
 import automation.alerts as alerts
+import automation.app_logger as app_logger
 import automation.auto_tuner as auto_tuner
 import analysis.backtest as backtest
 import core.accounts as accounts
@@ -24,6 +25,13 @@ import core.persistence as persistence
 import automation.watchdog as watchdog
 
 app = Flask(__name__, static_folder="static")
+
+
+@app.errorhandler(Exception)
+def handle_unhandled_error(e):
+    import traceback
+    app_logger.error(f"Unhandled error on {request.method} {request.path}: {e}\n{traceback.format_exc()}")
+    return jsonify({"ok": False, "error": str(e)}), 500
 
 bridge = mt5_bridge
 state = config.new_state()
@@ -154,21 +162,27 @@ def set_global_settings():
 def auto():
     data = request.get_json()
     if data["enabled"] and not _check_lock(data.get("passcode")):
+        app_logger.warning("Auto-trading enable attempt blocked: wrong trading-lock passcode")
         return jsonify({"ok": False, "error": "locked"}), 403
     state["auto_enabled"] = bool(data["enabled"])
     global _engine_thread
-    if state["auto_enabled"] and (_engine_thread is None or not _engine_thread.is_alive()):
-        _stop_flag.clear()
-        _engine_thread = threading.Thread(target=_engine_loop, daemon=True)
-        _engine_thread.start()
-    if not state["auto_enabled"]:
+    if state["auto_enabled"]:
+        app_logger.info(f"Auto-trading ENABLED (single-symbol {state['symbol']}/{state['timeframe']}, "
+                         f"strategy: {state['active_strategy']})")
+        if _engine_thread is None or not _engine_thread.is_alive():
+            _stop_flag.clear()
+            _engine_thread = threading.Thread(target=_engine_loop, daemon=True)
+            _engine_thread.start()
+    else:
         _stop_flag.set()
+        app_logger.info("Auto-trading disabled")
     return jsonify({"ok": True})
 
 
 @app.route("/api/close_all", methods=["POST"])
 def close_all():
     positions = bridge.get_open_positions(state["symbol"])
+    app_logger.info(f"Close all requested: closing {len(positions)} open position(s) on {state['symbol']}")
     for pos in positions:
         bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"], pos["type"],
                                global_settings["slippage_points"])
@@ -237,6 +251,7 @@ def get_analytics_per_strategy():
 
 @app.route("/api/position_manager/apply_all", methods=["POST"])
 def apply_all():
+    app_logger.info("Apply-now requested: running trailing/break-even/partial-TP against all open positions")
     engine._manage_positions(bridge, global_settings, alert_rules, triggered_alerts, partial_closed_tickets)
     return jsonify({"ok": True})
 
@@ -325,6 +340,7 @@ def set_lock():
     data = request.get_json()
     state["lock_enabled"] = bool(data["enabled"])
     state["lock_passcode"] = data.get("passcode", "")
+    app_logger.info(f"Trading lock {'enabled' if state['lock_enabled'] else 'disabled'}")
     return jsonify({"ok": True})
 
 
@@ -332,8 +348,10 @@ def set_lock():
 def set_watchlist_mode():
     data = request.get_json()
     if data["enabled"] and not _check_lock(data.get("passcode")):
+        app_logger.warning("Watchlist-mode enable attempt blocked: wrong trading-lock passcode")
         return jsonify({"ok": False, "error": "locked"}), 403
     state["watchlist_enabled"] = bool(data["enabled"])
+    app_logger.info(f"Watchlist auto-trading {'ENABLED' if state['watchlist_enabled'] else 'disabled'}")
     return jsonify({"ok": True})
 
 
@@ -386,6 +404,9 @@ def connect_account(account_id):
                          password=acc["password"], server=acc["server"] or None)
     if ok:
         active_account_id = account_id
+        app_logger.info(f"Connected to MT5 account profile '{acc['name']}' ({acc['server']})")
+    else:
+        app_logger.error(f"Failed to connect to MT5 account profile '{acc['name']}' ({acc['server']})")
     return jsonify({"ok": ok})
 
 
@@ -412,9 +433,11 @@ def train_ml_filter():
         features.append(ml_filter.build_features(strategy, deal_time.hour, deal_time.weekday()))
         labels.append(1 if d["profit"] > 0 else 0)
     if len(features) < 10:
+        app_logger.warning(f"ML filter training skipped: only {len(features)} labeled trades, need at least 10")
         return jsonify({"ok": False, "error": "not enough labeled trades yet (need at least 10)"}), 400
     weights = ml_filter.train(features, labels)
     ml_filter.save_weights(weights)
+    app_logger.info(f"ML filter trained on {len(features)} closed trades")
     return jsonify({"ok": True, "trained_on": len(features)})
 
 
@@ -430,34 +453,53 @@ def run_auto_tune():
     best = auto_tuner.suggest_best_strategy(per_strategy, min_trades)
     switched = False
     if global_settings.get("auto_tune_enabled", False) and state["active_strategy"] in disable and best:
+        app_logger.info(f"Auto-tune switched active strategy from {state['active_strategy']} to {best} "
+                         f"(flagged for poor profit factor: {disable})")
         state["active_strategy"] = best
         switched = True
+    elif disable:
+        app_logger.info(f"Auto-tune run: flagged {disable} for poor profit factor, best performer is {best}")
     return jsonify({"disable_suggested": disable, "best_strategy": best, "switched_to": best if switched else None})
+
+
+@app.route("/api/logs/recent")
+def get_recent_logs():
+    n = int(request.args.get("lines", 200))
+    return jsonify({"lines": app_logger.tail(n)})
 
 
 def _engine_loop():
     global _was_connected
+    app_logger.info("Engine loop started")
     while not _stop_flag.is_set():
-        connected = watchdog.check_connection(bridge)
-        if _was_connected and not connected:
-            watchdog.notify_webhook(global_settings.get("watchdog_webhook_url", ""),
-                                     "MT5 Bot: lost connection to MT5 terminal")
-        _was_connected = connected
+        try:
+            connected = watchdog.check_connection(bridge)
+            if _was_connected and not connected:
+                app_logger.error("Lost connection to MT5 terminal")
+                watchdog.notify_webhook(global_settings.get("watchdog_webhook_url", ""),
+                                         "MT5 Bot: lost connection to MT5 terminal")
+            elif not _was_connected and connected:
+                app_logger.info("MT5 terminal connection restored")
+            _was_connected = connected
 
-        if state.get("watchlist_enabled", False):
-            engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
-                                       0.0, 0.0, alert_rules, triggered_alerts, manual_signals,
-                                       blackout_windows=blackout_windows,
-                                       partial_closed_tickets=partial_closed_tickets)
-        else:
-            engine.run_once(bridge, state, strategy_settings, global_settings,
-                             daily_pnl_percent=0.0, drawdown_percent=0.0,
-                             alert_rules=alert_rules, triggered_alerts=triggered_alerts,
-                             blackout_windows=blackout_windows,
-                             partial_closed_tickets=partial_closed_tickets)
-        _save_persisted_state()
-        _sync_mt5_status_panel()
+            if state.get("watchlist_enabled", False):
+                engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
+                                           0.0, 0.0, alert_rules, triggered_alerts, manual_signals,
+                                           blackout_windows=blackout_windows,
+                                           partial_closed_tickets=partial_closed_tickets)
+            else:
+                engine.run_once(bridge, state, strategy_settings, global_settings,
+                                 daily_pnl_percent=0.0, drawdown_percent=0.0,
+                                 alert_rules=alert_rules, triggered_alerts=triggered_alerts,
+                                 blackout_windows=blackout_windows,
+                                 partial_closed_tickets=partial_closed_tickets)
+            _save_persisted_state()
+            _sync_mt5_status_panel()
+        except Exception as exc:
+            import traceback
+            app_logger.error(f"Engine loop tick failed (trading paused until next tick): {exc}\n{traceback.format_exc()}")
         time.sleep(5)
+    app_logger.info("Engine loop stopped")
 
 
 def _sync_mt5_status_panel():

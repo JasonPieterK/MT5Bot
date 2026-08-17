@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import analysis.analytics as analytics
 import automation.alerts as alerts
+import automation.app_logger as app_logger
 import automation.execution_log as execution_log
 import automation.json_logger as json_logger
 import automation.news_filter as news_filter
@@ -48,6 +49,14 @@ def log_trade(row):
     fields = ["time", "symbol", "strategy", "signal", "lots", "sl", "tp", "retcode"]
     json_logger.log_event("trade", dict(zip(fields, row)))
 
+    _time, symbol, strategy, signal, lots, sl, tp, retcode = row
+    if signal == "ERROR":
+        app_logger.error(f"Watchlist entry {symbol} ({strategy}) failed: {retcode}")
+    elif retcode in (10009, "10009"):
+        app_logger.info(f"Order placed: {signal} {lots} lots {symbol} ({strategy}) sl={sl} tp={tp}")
+    else:
+        app_logger.warning(f"Order REJECTED: {signal} {lots} lots {symbol} ({strategy}) — retcode {retcode}")
+
 
 def _should_flatten(drawdown_percent, global_settings):
     if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
@@ -66,24 +75,28 @@ def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts, pa
     positions = bridge.get_open_positions()
     for pos in positions:
         if global_settings.get("trailing_enabled", False):
-            trailing_manager.apply_trailing(
-                bridge, pos, global_settings.get("trailing_distance_points", 100))
+            if trailing_manager.apply_trailing(
+                    bridge, pos, global_settings.get("trailing_distance_points", 100)):
+                app_logger.info(f"Trailing stop moved on ticket {pos['ticket']} ({pos['symbol']})")
         if global_settings.get("breakeven_enabled", False):
-            trailing_manager.apply_breakeven(
-                bridge, pos,
-                global_settings.get("breakeven_trigger_points", 100),
-                global_settings.get("breakeven_offset_points", 10))
+            if trailing_manager.apply_breakeven(
+                    bridge, pos,
+                    global_settings.get("breakeven_trigger_points", 100),
+                    global_settings.get("breakeven_offset_points", 10)):
+                app_logger.info(f"Break-even applied on ticket {pos['ticket']} ({pos['symbol']})")
         if global_settings.get("partial_tp_enabled", False):
-            trailing_manager.apply_partial_tp(
-                bridge, pos,
-                global_settings.get("partial_tp_trigger_points", 100),
-                global_settings.get("partial_tp_close_fraction", 0.5),
-                partial_closed_tickets)
+            if trailing_manager.apply_partial_tp(
+                    bridge, pos,
+                    global_settings.get("partial_tp_trigger_points", 100),
+                    global_settings.get("partial_tp_close_fraction", 0.5),
+                    partial_closed_tickets):
+                app_logger.info(f"Partial take-profit closed on ticket {pos['ticket']} ({pos['symbol']})")
 
     triggered = alerts.check_price_alerts(bridge, alert_rules)
     for rule in triggered:
         alert_rules.remove(rule)
         triggered_alerts.append(rule)
+        app_logger.info(f"Price alert triggered: {rule['symbol']} {rule['condition']} {rule['price']}")
 
     if alerts.check_margin_alert(bridge, global_settings.get("margin_alert_level_percent", 100.0)):
         triggered_alerts.append({"id": "margin", "type": "margin", "message": "margin level below threshold"})
@@ -185,6 +198,8 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
     open_positions = bridge.get_open_positions(state["symbol"])
 
     if _should_flatten(drawdown_percent, global_settings):
+        if open_positions:
+            app_logger.warning(f"Flattening {len(open_positions)} position(s): drawdown/schedule kill-switch triggered")
         for pos in open_positions:
             bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"], pos["type"],
                                    global_settings["slippage_points"])

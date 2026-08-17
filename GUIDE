@@ -18,6 +18,7 @@ A complete walkthrough: install, first run, and every dashboard tab explained. I
    - [Backtest](#backtest)
    - [Signal filters](#signal-filters)
    - [Accounts](#accounts)
+   - [Logs](#logs)
 6. [Choosing a strategy](#choosing-a-strategy)
 7. [Recommended first-time setup](#recommended-first-time-setup)
 8. [On-chart status panel (MQL5)](#on-chart-status-panel-mql5)
@@ -178,6 +179,10 @@ Every filter here is **off by default** — nothing changes until you turn one o
 
 Save multiple MT5 login profiles (name, terminal path, login, password, server) and switch between them with **Connect**. One MT5 terminal process can only be logged into one account at a time — this is a login switcher, not simultaneous multi-account trading.
 
+### Logs
+
+A live, plain-English feed of everything the bot does — connection state, every order placed or rejected, trailing/break-even/partial-TP actions, triggered alerts, kill-switch flattens, account connects, and every caught error, each with a timestamp. Auto-refreshes every 3 seconds while the tab is open (toggle off if you're scrolled up reading older entries). Same content lives at `logs/app.log` on disk, so you can check it even if the dashboard itself fails to load. Any API call that fails also pops a small error toast in the bottom-left corner immediately, regardless of which tab you're on.
+
 ## Choosing a strategy
 
 | Strategy | Style | Good for |
@@ -214,8 +219,11 @@ The two processes sync via a plain text file in MT5's shared Common Files folder
 
 ## Troubleshooting
 
+**Something's broken and you don't know why**
+Check the **Logs** tab in the dashboard first — it's a plain-English feed of everything the bot has done (trades placed/rejected, connection drops, filter kill-switches, every caught error), auto-refreshing every 3s. The same feed is also on disk at `logs/app.log` if the dashboard itself won't load — open that file in any text editor. Any request that fails also shows a toast in the bottom-left corner of the dashboard immediately, so you don't have to go looking.
+
 **Equity shows `-` or `0`**
-MT5 terminal isn't connected, or the bot connected before the terminal finished logging in. Confirm the terminal itself shows your account balance, then restart `start.bat`.
+MT5 terminal isn't connected, or the bot connected before the terminal finished logging in. Confirm the terminal itself shows your account balance, then restart `start.bat`. Check the Logs tab / `logs/app.log` for a "Lost connection to MT5 terminal" line.
 
 **"Status: app not found" on the on-chart panel**
 The Python app isn't running, or hasn't written its first status file yet (takes up to ~5s after Auto/Watchlist mode's first tick — actually, the status file is written every engine tick even with Auto off, so this should populate within seconds of `start.bat` running). Confirm `app.py` is actually running in your terminal window.
@@ -236,7 +244,8 @@ Also intentional — those caps are hardcoded in `src/strategies/grid.py`, not e
 
 | Path | What's in it |
 |---|---|
-| `logs/trades.csv` | Every order this bot placed (time, symbol, strategy, signal, lots, sl, tp, retcode). |
+| `logs/app.log` | **Start here for troubleshooting.** Plain-English, human-readable log of every meaningful event: connection state, auto-trading toggles, orders placed/rejected, trailing/break-even/partial-TP actions, alerts triggered, kill-switch flattens, account connects, and every caught error — with a timestamp on each line. Rotates at 5MB (old one kept as `.1`). Also viewable live in the dashboard's **Logs** tab. |
+| `logs/trades.csv` | Every order this bot placed (time, symbol, strategy, signal, lots, sl, tp, retcode) — machine-readable twin of the trade lines in `app.log`. |
 | `logs/execution.csv` | Order latency and requote tracking per symbol. |
 | `logs/events.jsonl` | Structured JSON event log, rotates at 5MB. |
 | `logs/app_state.json` | Persisted settings/watchlist/blackouts/accounts — auto-loaded on startup (trading-armed flags always reset, see above). |

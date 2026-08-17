@@ -8,3 +8,5 @@ logs/*.jsonl
 logs/*.json.1
 logs/*.jsonl.1
 logs/*.txt
+logs/*.log
+logs/*.log.1

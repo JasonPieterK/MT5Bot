@@ -358,3 +358,45 @@ def test_sync_mt5_status_panel_writes_file(client, tmp_path, monkeypatch):
 def test_sync_mt5_status_panel_never_raises_on_bridge_error(client):
     app_module.bridge.get_account_equity.side_effect = RuntimeError("disconnected")
     app_module._sync_mt5_status_panel()  # must not raise
+
+
+def test_get_recent_logs(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.app_logger, "LOG_PATH", str(tmp_path / "app.log"))
+    app_module.app_logger.info("test line one")
+    app_module.app_logger.info("test line two")
+    resp = client.get("/api/logs/recent")
+    assert resp.status_code == 200
+    lines = resp.get_json()["lines"]
+    assert len(lines) == 2
+    assert "test line two" in lines[-1]
+
+
+def test_get_recent_logs_respects_lines_param(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.app_logger, "LOG_PATH", str(tmp_path / "app.log"))
+    for i in range(5):
+        app_module.app_logger.info(f"line {i}")
+    resp = client.get("/api/logs/recent?lines=2")
+    lines = resp.get_json()["lines"]
+    assert len(lines) == 2
+    assert "line 4" in lines[-1]
+
+
+def test_unhandled_error_returns_json_and_logs(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.app_logger, "LOG_PATH", str(tmp_path / "app.log"))
+    app_module.app.config["PROPAGATE_EXCEPTIONS"] = False
+    app_module.bridge.get_account_equity.side_effect = RuntimeError("simulated MT5 failure")
+    resp = client.get("/api/status")
+    app_module.app.config["PROPAGATE_EXCEPTIONS"] = True
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "simulated MT5 failure" in body["error"]
+    logged = "\n".join(app_module.app_logger.tail())
+    assert "simulated MT5 failure" in logged
+
+
+def test_auto_enable_logs_event(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.app_logger, "LOG_PATH", str(tmp_path / "app.log"))
+    client.post("/api/auto", json={"enabled": True})
+    logged = "\n".join(app_module.app_logger.tail())
+    assert "Auto-trading ENABLED" in logged

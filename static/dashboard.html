@@ -145,6 +145,7 @@
     <button class="chip" id="navBacktest"><i class="ph-bold ph-clock-counter-clockwise"></i>Backtest</button>
     <button class="chip" id="navSignalFilters"><i class="ph-bold ph-funnel"></i>Signal filters</button>
     <button class="chip" id="navAccounts"><i class="ph-bold ph-identification-card"></i>Accounts</button>
+    <button class="chip" id="navLogs"><i class="ph-bold ph-file-text"></i>Logs</button>
   </div>
 
   <div class="nav-spacer"></div>
@@ -314,6 +315,18 @@
       <tbody id="accountsBody"></tbody></table>
   </section>
 
+  <section class="mmm-card panel span2" id="logsPanel" style="display:none;">
+    <h3><i class="ph-bold ph-file-text"></i>Logs <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— plain-English record of everything the bot does</span></h3>
+    <p class="hint">Also written to <code>logs/app.log</code> on disk — open it directly if the app itself won't start.</p>
+    <div class="row-actions">
+      <button class="mmm-btn sm" id="refreshLogsBtn"><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px;">
+        <input type="checkbox" id="logsAutoRefresh" checked> Auto-refresh
+      </label>
+    </div>
+    <pre id="logsView" style="background:var(--field); border:var(--bw-thin) solid var(--border-soft); border-radius:var(--r-md); padding:12px; max-height:420px; overflow-y:auto; font-family:var(--font-mono); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
+  </section>
+
   <section class="mmm-card panel span2" id="signalFiltersPanel" style="display:none;">
     <h3><i class="ph-bold ph-funnel"></i>Signal filters <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— all opt-in, off by default</span></h3>
     <div class="settings-grid">
@@ -355,11 +368,52 @@
 </main>
 
 <div id="alertBanner"><i class="ph-bold ph-warning"></i><span id="alertBannerText"></span></div>
+<div id="apiErrorBanner" style="position:fixed; bottom:var(--s-5); left:var(--s-5); z-index:900; display:none; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-size:13px; background:var(--ink); color:var(--paper); border:var(--bw) solid var(--danger); border-radius:var(--r-md); box-shadow:var(--sh-3); padding:12px 16px; max-width:420px; opacity:0; transform:translateY(12px); transition: opacity var(--dur-std) var(--ease-out), transform var(--dur-std) var(--ease-out);">
+  <i class="ph-bold ph-warning-circle" style="color:var(--danger); font-size:18px;"></i><span id="apiErrorBannerText"></span>
+</div>
 <div id="modalRoot"></div>
 
 <script>
 const STRATEGIES = ["trend", "scalping", "smc", "grid", "pivot_breakout"];
 let currentTab = "trend";
+
+/* ---------- Global fetch wrapper: surface every failed API call as a toast, ---------- */
+/* and log it in the browser console too, per "log everything" / "show errors on the site". */
+let apiErrorBannerTimer = null;
+function showApiError(message) {
+  const banner = document.getElementById("apiErrorBanner");
+  document.getElementById("apiErrorBannerText").textContent = message;
+  banner.style.display = "flex";
+  requestAnimationFrame(() => { banner.style.opacity = "1"; banner.style.transform = "translateY(0)"; });
+  if (apiErrorBannerTimer) clearTimeout(apiErrorBannerTimer);
+  apiErrorBannerTimer = setTimeout(() => {
+    banner.style.opacity = "0";
+    banner.style.transform = "translateY(12px)";
+    setTimeout(() => { banner.style.display = "none"; }, 300);
+  }, 6000);
+}
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = async function(...args) {
+  let res;
+  try {
+    res = await _rawFetch(...args);
+  } catch (networkErr) {
+    console.error("Network error calling", args[0], networkErr);
+    showApiError("Can't reach the MT5 Bot server — is app.py still running?");
+    throw networkErr;
+  }
+  if (!res.ok) {
+    let message = `Request to ${args[0]} failed (HTTP ${res.status})`;
+    try {
+      const body = await res.clone().json();
+      if (body && body.error) message = body.error;
+    } catch (parseErr) { /* response wasn't JSON, keep the generic message */ }
+    console.error("API error:", message, "-", args[0]);
+    showApiError(message);
+  }
+  return res;
+};
 
 /* ---------- MMM modal helpers (replace confirm/prompt/alert) ---------- */
 function closeModal() { document.getElementById("modalRoot").innerHTML = ""; }
@@ -617,11 +671,11 @@ document.getElementById("closeAllBtn").onclick = withLoading(document.getElement
 document.getElementById("saveSettingsBtn").onclick = saveSettings;
 
 function showPanel(id) {
-  const panels = ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel", "accountsPanel"];
+  const panels = ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel", "accountsPanel", "logsPanel"];
   const navMap = {
     positionMgrPanel: "navPositionMgr", analyticsPanel: "navAnalytics", alertsPanel: "navAlerts",
     watchlistPanel: "navWatchlist", backtestPanel: "navBacktest", signalFiltersPanel: "navSignalFilters",
-    accountsPanel: "navAccounts",
+    accountsPanel: "navAccounts", logsPanel: "navLogs",
   };
   panels.forEach(p => {
     document.getElementById(p).style.display = (p === id) ? "block" : "none";
@@ -630,6 +684,21 @@ function showPanel(id) {
 }
 document.getElementById("navSignalFilters").onclick = () => { showPanel("signalFiltersPanel"); };
 document.getElementById("navAccounts").onclick = () => { showPanel("accountsPanel"); loadAccounts(); };
+document.getElementById("navLogs").onclick = () => { showPanel("logsPanel"); loadLogs(); };
+
+async function loadLogs() {
+  const res = await fetch("/api/logs/recent?lines=300");
+  const data = await res.json();
+  const view = document.getElementById("logsView");
+  const wasAtBottom = view.scrollTop + view.clientHeight >= view.scrollHeight - 20;
+  view.textContent = (data.lines && data.lines.length) ? data.lines.join("\n") : "No log entries yet.";
+  if (wasAtBottom) view.scrollTop = view.scrollHeight;
+}
+document.getElementById("refreshLogsBtn").onclick = loadLogs;
+setInterval(() => {
+  if (document.getElementById("logsPanel").style.display !== "none" &&
+      document.getElementById("logsAutoRefresh").checked) loadLogs();
+}, 3000);
 
 async function loadAccounts() {
   const res = await fetch("/api/accounts");
