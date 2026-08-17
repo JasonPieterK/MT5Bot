@@ -1,0 +1,12 @@
+{"event": "trade", "time": "2026-08-17T04:30:19.963284+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:30:19.973724+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:30:19.978983+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "ERROR", "lots": 0, "sl": null, "tp": null, "retcode": "boom"}
+{"event": "trade", "time": "2026-08-17T04:30:19.982607+00:00", "symbol": "GBPUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:31:20.230435+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:31:20.239103+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:31:20.243669+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "ERROR", "lots": 0, "sl": null, "tp": null, "retcode": "boom"}
+{"event": "trade", "time": "2026-08-17T04:31:20.246822+00:00", "symbol": "GBPUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:32:26.590020+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:32:26.598368+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}
+{"event": "trade", "time": "2026-08-17T04:32:26.602392+00:00", "symbol": "EURUSD", "strategy": "trend", "signal": "ERROR", "lots": 0, "sl": null, "tp": null, "retcode": "boom"}
+{"event": "trade", "time": "2026-08-17T04:32:26.605845+00:00", "symbol": "GBPUSD", "strategy": "trend", "signal": "BUY", "lots": 5.62, "sl": 1.102222533594792, "tp": 1.1069624440086794, "retcode": 10009}

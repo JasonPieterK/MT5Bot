@@ -47,6 +47,7 @@
   <button id="navWatchlist">Watchlist</button>
   <button id="navBacktest">Backtest</button>
   <button id="navSignalFilters">Signal Filters</button>
+  <button id="navAccounts">Accounts</button>
 </header>
 <main>
   <section class="panel">
@@ -90,10 +91,17 @@
         <select id="swapFilterEnabled"><option value="false">false</option><option value="true">true</option></select></div>
       <div class="field"><label>Swap Block Hours Before Rollover</label><input id="swapBlockHours" value="1"></div>
       <div class="field"><label>Rollover Hour (UTC)</label><input id="swapRolloverHour" value="21"></div>
+      <div class="field" title="Flatten and stop new entries near weekly close"><label>Schedule Filter Enabled</label>
+        <select id="scheduleFilterEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>Disable Weekday (0=Mon..6=Sun)</label><input id="scheduleWeekday" value="4"></div>
+      <div class="field"><label>Disable Hour (UTC)</label><input id="scheduleHour" value="21"></div>
+      <div class="field" title="POSTed on MT5 disconnect: Telegram bot API URL, Slack/Discord webhook, or any custom endpoint"><label>Watchdog Webhook URL</label>
+        <input id="watchdogWebhook" placeholder="https://..." style="width:100%;"></div>
     </div>
     <div class="row-actions">
       <button id="savePositionMgrBtn">Save</button>
       <button id="applyAllBtn">Apply Now to All Positions</button>
+      <button id="saveStateBtn">Save State Now</button>
     </div>
     <h3 style="margin-top:16px;">Trading Lock (local passcode, optional)</h3>
     <div class="row-actions">
@@ -170,6 +178,21 @@
     <div class="stat"><span>Profit Factor</span><span id="btProfitFactor">-</span></div>
     <div class="stat"><span>Trades</span><span id="btTradeCount">-</span></div>
     <div class="stat"><span>Current Streak</span><span id="btStreak">-</span></div>
+  </section>
+
+  <section class="panel" id="accountsPanel" style="display:none; grid-column: span 2;">
+    <h3>MT5 Account Profiles</h3>
+    <p style="color:var(--muted); font-size:12px;">One MT5 terminal process can only be logged into one account at a time — this switches the active login, it does not trade multiple accounts simultaneously.</p>
+    <div class="row-actions">
+      <input id="accName" placeholder="Name" style="width:100px;">
+      <input id="accPath" placeholder="terminal64.exe path (optional)" style="width:200px;">
+      <input id="accLogin" placeholder="login" style="width:100px;">
+      <input id="accPassword" type="password" placeholder="password" style="width:120px;">
+      <input id="accServer" placeholder="server" style="width:120px;">
+      <button id="addAccountBtn">Add</button>
+    </div>
+    <table><thead><tr><th>Name</th><th>Server</th><th>Login</th><th></th></tr></thead>
+      <tbody id="accountsBody"></tbody></table>
   </section>
 
   <section class="panel" id="signalFiltersPanel" style="display:none; grid-column: span 2;">
@@ -345,11 +368,49 @@ document.getElementById("closeAllBtn").onclick = async () => {
 document.getElementById("saveSettingsBtn").onclick = saveSettings;
 
 function showPanel(id) {
-  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel"].forEach(p => {
+  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel", "accountsPanel"].forEach(p => {
     document.getElementById(p).style.display = (p === id) ? "block" : "none";
   });
 }
 document.getElementById("navSignalFilters").onclick = () => { showPanel("signalFiltersPanel"); };
+document.getElementById("navAccounts").onclick = () => { showPanel("accountsPanel"); loadAccounts(); };
+
+async function loadAccounts() {
+  const res = await fetch("/api/accounts");
+  const accs = await res.json();
+  const body = document.getElementById("accountsBody");
+  body.innerHTML = "";
+  accs.forEach(a => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${a.name}</td><td>${a.server}</td><td>${a.login}</td>` +
+      `<td><button data-connect="${a.id}">Connect</button> <button data-del="${a.id}">Delete</button></td>`;
+    const [connectBtn, delBtn] = tr.querySelectorAll("button");
+    connectBtn.onclick = async () => {
+      const resp = await fetch(`/api/accounts/${a.id}/connect`, { method: "POST" });
+      const result = await resp.json();
+      alert(result.ok ? "Connected." : "Connection failed.");
+    };
+    delBtn.onclick = async () => {
+      await fetch(`/api/accounts/${a.id}`, { method: "DELETE" });
+      loadAccounts();
+    };
+    body.appendChild(tr);
+  });
+}
+document.getElementById("addAccountBtn").onclick = async () => {
+  await fetch("/api/accounts", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      name: document.getElementById("accName").value,
+      path: document.getElementById("accPath").value,
+      login: Number(document.getElementById("accLogin").value) || null,
+      password: document.getElementById("accPassword").value,
+      server: document.getElementById("accServer").value,
+    }) });
+  loadAccounts();
+};
+document.getElementById("saveStateBtn").onclick = async () => {
+  await fetch("/api/state/save", { method: "POST" });
+};
 document.getElementById("saveSignalFiltersBtn").onclick = async () => {
   await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({
@@ -474,6 +535,10 @@ document.getElementById("savePositionMgrBtn").onclick = async () => {
       swap_filter_enabled: document.getElementById("swapFilterEnabled").value === "true",
       swap_block_hours_before_rollover: Number(document.getElementById("swapBlockHours").value),
       swap_rollover_hour_utc: Number(document.getElementById("swapRolloverHour").value),
+      schedule_filter_enabled: document.getElementById("scheduleFilterEnabled").value === "true",
+      schedule_disable_weekday: Number(document.getElementById("scheduleWeekday").value),
+      schedule_disable_hour_utc: Number(document.getElementById("scheduleHour").value),
+      watchdog_webhook_url: document.getElementById("watchdogWebhook").value,
     }) });
 };
 document.getElementById("applyAllBtn").onclick = async () => {

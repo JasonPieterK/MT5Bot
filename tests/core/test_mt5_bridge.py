@@ -139,3 +139,18 @@ def test_get_history_deals_empty_when_none(mt5_mock):
     fake.history_deals_get.return_value = None
     from datetime import datetime
     assert bridge.get_history_deals(datetime(2024, 1, 1)) == []
+
+
+def test_connect_with_account_params(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.initialize.return_value = True
+    assert bridge.connect(path="C:/MT5/terminal64.exe", login=12345, password="pw", server="Demo") is True
+    fake.initialize.assert_called_once_with(
+        path="C:/MT5/terminal64.exe", login=12345, password="pw", server="Demo")
+
+
+def test_connect_no_params_calls_bare_initialize(mt5_mock):
+    bridge, fake = mt5_mock
+    fake.initialize.return_value = True
+    bridge.connect()
+    fake.initialize.assert_called_once_with()

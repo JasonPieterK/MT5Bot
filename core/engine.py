@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 
 import automation.alerts as alerts
 import automation.execution_log as execution_log
+import automation.json_logger as json_logger
 import automation.news_filter as news_filter
+import automation.schedule_filter as schedule_filter
 import automation.swap_filter as swap_filter
 import core.correlation as correlation
 import core.htf_filter as htf_filter
@@ -36,6 +38,21 @@ def log_trade(row):
         if write_header:
             writer.writerow(["time", "symbol", "strategy", "signal", "lots", "sl", "tp", "retcode"])
         writer.writerow(row)
+
+    fields = ["time", "symbol", "strategy", "signal", "lots", "sl", "tp", "retcode"]
+    json_logger.log_event("trade", dict(zip(fields, row)))
+
+
+def _should_flatten(drawdown_percent, global_settings):
+    if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
+        return True
+    if global_settings.get("schedule_filter_enabled", False):
+        if schedule_filter.should_flatten_for_schedule(
+                datetime.now(timezone.utc),
+                global_settings.get("schedule_disable_weekday", 4),
+                global_settings.get("schedule_disable_hour_utc", 21)):
+            return True
+    return False
 
 
 def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts, partial_closed_tickets=None):
@@ -131,7 +148,7 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
              alert_rules=None, triggered_alerts=None, blackout_windows=None, partial_closed_tickets=None):
     open_positions = bridge.get_open_positions(state["symbol"])
 
-    if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
+    if _should_flatten(drawdown_percent, global_settings):
         for pos in open_positions:
             bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"], pos["type"],
                                    global_settings["slippage_points"])

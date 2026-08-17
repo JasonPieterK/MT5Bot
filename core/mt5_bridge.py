@@ -9,8 +9,17 @@ TIMEFRAME_MAP = {
 }
 
 
-def connect():
-    ok = mt5.initialize()
+def connect(path=None, login=None, password=None, server=None):
+    kwargs = {}
+    if path:
+        kwargs["path"] = path
+    if login:
+        kwargs["login"] = login
+    if password:
+        kwargs["password"] = password
+    if server:
+        kwargs["server"] = server
+    ok = mt5.initialize(**kwargs) if kwargs else mt5.initialize()
     if not ok:
         print(f"MT5 connect failed: {mt5.last_error()}")
     return ok

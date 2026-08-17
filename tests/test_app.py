@@ -16,6 +16,7 @@ def client(monkeypatch):
     app_module.watchlist.clear()
     app_module.manual_signals.clear()
     app_module.blackout_windows.clear()
+    app_module.account_profiles.clear()
     app_module.app.config["TESTING"] = True
     yield app_module.app.test_client()
     app_module._stop_flag.set()
@@ -219,3 +220,33 @@ def test_analytics_export_returns_csv(client):
     assert resp.status_code == 200
     assert "text/csv" in resp.content_type
     assert "ticket" in resp.get_data(as_text=True)
+
+
+def test_account_crud(client):
+    resp = client.post("/api/accounts", json={"name": "Demo", "path": "C:/MT5/terminal64.exe",
+                                                "login": 12345, "password": "pw", "server": "Broker-Demo"})
+    assert resp.status_code == 200
+    acc = resp.get_json()
+    assert "password" not in acc
+    list_resp = client.get("/api/accounts")
+    assert len(list_resp.get_json()) == 1
+    client.delete(f"/api/accounts/{acc['id']}")
+    assert client.get("/api/accounts").get_json() == []
+
+
+def test_connect_account_calls_bridge_connect(client):
+    created = client.post("/api/accounts", json={"name": "Demo", "path": "C:/MT5/terminal64.exe",
+                                                   "login": 12345, "password": "pw", "server": "Broker-Demo"}).get_json()
+    app_module.bridge.connect.return_value = True
+    resp = client.post(f"/api/accounts/{created['id']}/connect")
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+    app_module.bridge.connect.assert_called_once_with(
+        path="C:/MT5/terminal64.exe", login=12345, password="pw", server="Broker-Demo")
+
+
+def test_save_state_endpoint(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module.persistence, "STATE_PATH", str(tmp_path / "app_state.json"))
+    resp = client.post("/api/state/save")
+    assert resp.status_code == 200
+    assert app_module.persistence.load_all() is not None

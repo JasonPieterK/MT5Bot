@@ -71,6 +71,10 @@ GLOBAL_SETTINGS = {
     "swap_filter_enabled": False,
     "swap_block_hours_before_rollover": 1,
     "swap_rollover_hour_utc": 21,
+    "schedule_filter_enabled": False,
+    "schedule_disable_weekday": 4,
+    "schedule_disable_hour_utc": 21,
+    "watchdog_webhook_url": "",
 }
 
 

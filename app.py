@@ -8,10 +8,13 @@ from flask import Flask, jsonify, request, send_from_directory
 import analysis.analytics as analytics
 import automation.alerts as alerts
 import analysis.backtest as backtest
+import core.accounts as accounts
 import core.config as config
 import core.engine as engine
 import automation.journal as journal
 import core.mt5_bridge as mt5_bridge
+import core.persistence as persistence
+import automation.watchdog as watchdog
 
 app = Flask(__name__, static_folder="static")
 
@@ -27,9 +30,40 @@ manual_signals = []
 _next_watchlist_id = 1
 blackout_windows = []
 _next_blackout_id = 1
+partial_closed_tickets = set()
+account_profiles = []
+_next_account_id = 1
+active_account_id = None
+_was_connected = True
 
 _engine_thread = None
 _stop_flag = threading.Event()
+
+
+def _load_persisted_state():
+    saved = persistence.load_all()
+    if not saved:
+        return
+    state.update(saved.get("state", {}))
+    strategy_settings.update(saved.get("strategy_settings", {}))
+    global_settings.update(saved.get("global_settings", {}))
+    watchlist[:] = saved.get("watchlist", [])
+    blackout_windows[:] = saved.get("blackout_windows", [])
+    account_profiles[:] = saved.get("account_profiles", [])
+
+
+def _save_persisted_state():
+    persistence.save_all({
+        "state": state,
+        "strategy_settings": strategy_settings,
+        "global_settings": global_settings,
+        "watchlist": watchlist,
+        "blackout_windows": blackout_windows,
+        "account_profiles": account_profiles,
+    })
+
+
+_load_persisted_state()
 
 
 @app.route("/")
@@ -183,7 +217,7 @@ def get_analytics():
 
 @app.route("/api/position_manager/apply_all", methods=["POST"])
 def apply_all():
-    engine._manage_positions(bridge, global_settings, alert_rules, triggered_alerts)
+    engine._manage_positions(bridge, global_settings, alert_rules, triggered_alerts, partial_closed_tickets)
     return jsonify({"ok": True})
 
 
@@ -285,17 +319,68 @@ def export_analytics():
                      headers={"Content-Disposition": "attachment; filename=analytics_export.csv"})
 
 
+@app.route("/api/accounts", methods=["GET"])
+def get_accounts():
+    return jsonify([{k: v for k, v in a.items() if k != "password"} for a in account_profiles])
+
+
+@app.route("/api/accounts", methods=["POST"])
+def post_account():
+    global _next_account_id
+    data = request.get_json()
+    acc = accounts.new_account(_next_account_id, data["name"], data.get("path", ""),
+                                data.get("login"), data.get("password", ""), data.get("server", ""))
+    _next_account_id += 1
+    account_profiles.append(acc)
+    return jsonify({k: v for k, v in acc.items() if k != "password"})
+
+
+@app.route("/api/accounts/<int:account_id>", methods=["DELETE"])
+def delete_account(account_id):
+    account_profiles[:] = [a for a in account_profiles if a["id"] != account_id]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/accounts/<int:account_id>/connect", methods=["POST"])
+def connect_account(account_id):
+    global active_account_id
+    acc = next((a for a in account_profiles if a["id"] == account_id), None)
+    if not acc:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    ok = bridge.connect(path=acc["path"] or None, login=acc["login"],
+                         password=acc["password"], server=acc["server"] or None)
+    if ok:
+        active_account_id = account_id
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/state/save", methods=["POST"])
+def save_state_endpoint():
+    _save_persisted_state()
+    return jsonify({"ok": True})
+
+
 def _engine_loop():
+    global _was_connected
     while not _stop_flag.is_set():
+        connected = watchdog.check_connection(bridge)
+        if _was_connected and not connected:
+            watchdog.notify_webhook(global_settings.get("watchdog_webhook_url", ""),
+                                     "MT5 Bot: lost connection to MT5 terminal")
+        _was_connected = connected
+
         if state.get("watchlist_enabled", False):
             engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
                                        0.0, 0.0, alert_rules, triggered_alerts, manual_signals,
-                                       blackout_windows=blackout_windows)
+                                       blackout_windows=blackout_windows,
+                                       partial_closed_tickets=partial_closed_tickets)
         else:
             engine.run_once(bridge, state, strategy_settings, global_settings,
                              daily_pnl_percent=0.0, drawdown_percent=0.0,
                              alert_rules=alert_rules, triggered_alerts=triggered_alerts,
-                             blackout_windows=blackout_windows)
+                             blackout_windows=blackout_windows,
+                             partial_closed_tickets=partial_closed_tickets)
+        _save_persisted_state()
         time.sleep(5)
 
 
