@@ -19,6 +19,10 @@ Multi-strategy automated trading robot for MetaTrader 5, with a local web dashbo
 - **Risk/execution**: partial take-profit, portfolio-level risk gate, execution latency/requote logging, swap-rollover blackout filter
 - **Ops**: MT5 connection watchdog with webhook alerts, persistent app state across restarts, saved account profiles (switch logins), scheduled Friday-close flatten, structured JSON event log
 - **Per-strategy analytics breakdown**, equity curve chart, backtest parameter sweep, trade-open webhook notifications, dark/light theme + responsive layout
+- **Ensemble mode**: trades only when a majority of the 4 directional strategies agree
+- **ML win-probability filter**: small logistic regression trained on your own closed-deal history (strategy/hour/weekday features — MT5 deal history has no sl/tp, so reward:risk isn't a usable feature and isn't fabricated)
+- **Microstructure filters**: spread-quality (bar-level spread vs recent average) and tick-momentum (direction bias of recent ticks)
+- **Self-tuning**: flags strategies with a statistically meaningful losing track record, can auto-switch to the best performer; one-click applies the best backtest sweep result to a strategy's settings
 
 ## Requirements
 
