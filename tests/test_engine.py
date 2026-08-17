@@ -201,3 +201,26 @@ def test_watchlist_one_entry_error_does_not_stop_others():
     engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
                                0.0, 0.0, [], [], manual_signals)
     assert bridge.place_order.called
+
+
+def test_run_once_skips_order_during_blackout():
+    bridge = MagicMock()
+    bridge.get_rates.return_value = make_uptrend_rates()
+    bridge.get_open_positions.return_value = []
+    bridge.get_account_equity.return_value = 10000
+    bridge.get_margin_level.return_value = 500.0
+    state = {"active_strategy": "trend", "symbol": "EURUSD", "timeframe": "M5"}
+    strategy_settings = {"trend": {"ma_type": "EMA", "fast_period": 9, "slow_period": 21,
+                                    "rsi_period": 14, "rsi_buy_below": 65, "rsi_sell_above": 35}}
+    global_settings = {"risk_percent": 1.0, "max_concurrent_trades": 3,
+                        "daily_loss_limit_percent": 5.0, "max_drawdown_percent": 15.0,
+                        "slippage_points": 20, "margin_alert_level_percent": 100.0}
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    blackout_windows = [{"id": 1, "start": (now - timedelta(minutes=5)).isoformat(),
+                          "end": (now + timedelta(minutes=5)).isoformat(), "label": "test"}]
+
+    engine.run_once(bridge, state, strategy_settings, global_settings,
+                     daily_pnl_percent=0.0, drawdown_percent=0.0, blackout_windows=blackout_windows)
+
+    assert not bridge.place_order.called

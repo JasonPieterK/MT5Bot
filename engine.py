@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 
 import alerts
+import news_filter
 import risk_manager as rm
 import trailing_manager
 from strategies import trend, scalping, smc, grid, pivot_breakout
@@ -51,7 +52,7 @@ def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts):
 
 
 def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percent, drawdown_percent,
-             alert_rules=None, triggered_alerts=None):
+             alert_rules=None, triggered_alerts=None, blackout_windows=None):
     open_positions = bridge.get_open_positions(state["symbol"])
 
     if rm.should_flatten_all(drawdown_percent, global_settings["max_drawdown_percent"]):
@@ -76,6 +77,9 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         signal, sl, tp = module.get_signal(rates, strategy_settings[strategy_name])
 
     if signal == "NONE":
+        return
+
+    if news_filter.is_blackout_active(datetime.now(timezone.utc), blackout_windows or []):
         return
 
     allowed, reason = rm.check_trade_allowed(
@@ -104,13 +108,14 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
 
 
 def run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
-                        daily_pnl_percent, drawdown_percent, alert_rules, triggered_alerts, manual_signals):
+                        daily_pnl_percent, drawdown_percent, alert_rules, triggered_alerts, manual_signals,
+                        blackout_windows=None):
     for entry in watchlist:
         if not entry["enabled"]:
             continue
         try:
             _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
-                                  daily_pnl_percent, drawdown_percent, manual_signals)
+                                  daily_pnl_percent, drawdown_percent, manual_signals, blackout_windows)
         except Exception as exc:
             log_trade([datetime.now(timezone.utc).isoformat(), entry["symbol"], entry["strategy"],
                        "ERROR", 0, None, None, str(exc)])
@@ -120,7 +125,7 @@ def run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
 
 
 def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
-                          daily_pnl_percent, drawdown_percent, manual_signals):
+                          daily_pnl_percent, drawdown_percent, manual_signals, blackout_windows=None):
     symbol, timeframe, strategy_name = entry["symbol"], entry["timeframe"], entry["strategy"]
     module = STRATEGY_MODULES[strategy_name]
     rates = bridge.get_rates(symbol, timeframe, 100)
@@ -131,6 +136,9 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
 
     if entry["mode"] == "alert_only":
         manual_signals.append({"symbol": symbol, "strategy": strategy_name, "signal": signal, "sl": sl, "tp": tp})
+        return
+
+    if news_filter.is_blackout_active(datetime.now(timezone.utc), blackout_windows or []):
         return
 
     open_positions = bridge.get_open_positions()

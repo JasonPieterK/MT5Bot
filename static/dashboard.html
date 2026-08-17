@@ -45,6 +45,7 @@
   <button id="navAnalytics">Analytics</button>
   <button id="navAlerts">Alerts</button>
   <button id="navWatchlist">Watchlist</button>
+  <button id="navBacktest">Backtest</button>
 </header>
 <main>
   <section class="panel">
@@ -101,6 +102,15 @@
     </div>
     <table><thead><tr><th>Symbol</th><th>Condition</th><th>Price</th><th></th></tr></thead>
       <tbody id="alertsBody"></tbody></table>
+    <h3 style="margin-top:16px;">Blackout Windows (news/session)</h3>
+    <div class="row-actions">
+      <input id="boStart" placeholder="2026-09-05T12:25:00+00:00" style="width:220px;">
+      <input id="boEnd" placeholder="2026-09-05T12:35:00+00:00" style="width:220px;">
+      <input id="boLabel" placeholder="NFP" style="width:80px;">
+      <button id="addBlackoutBtn">Add</button>
+    </div>
+    <table><thead><tr><th>Start</th><th>End</th><th>Label</th><th></th></tr></thead>
+      <tbody id="blackoutsBody"></tbody></table>
   </section>
 
   <section class="panel" id="watchlistPanel" style="display:none; grid-column: span 2;">
@@ -120,6 +130,25 @@
     <h3 style="margin-top:16px;">Manual Signals (alert_only)</h3>
     <table><thead><tr><th>Symbol</th><th>Strategy</th><th>Signal</th></tr></thead>
       <tbody id="manualSignalsBody"></tbody></table>
+  </section>
+
+  <section class="panel" id="backtestPanel" style="display:none; grid-column: span 2;">
+    <h3>Backtest</h3>
+    <div class="row-actions">
+      <input id="btSymbol" placeholder="EURUSD" style="width:90px;">
+      <select id="btTf"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
+      <select id="btStrategy">
+        <option value="trend">Trend</option><option value="scalping">Scalping</option>
+        <option value="smc">SMC</option><option value="pivot_breakout">Pivot Breakout</option>
+      </select>
+      <input id="btBars" placeholder="bars (e.g. 500)" value="500" style="width:110px;">
+      <input id="btEquity" placeholder="initial equity" value="10000" style="width:110px;">
+      <button id="runBacktestBtn">Run</button>
+    </div>
+    <div class="stat"><span>Win Rate</span><span id="btWinRate">-</span></div>
+    <div class="stat"><span>Profit Factor</span><span id="btProfitFactor">-</span></div>
+    <div class="stat"><span>Trades</span><span id="btTradeCount">-</span></div>
+    <div class="stat"><span>Current Streak</span><span id="btStreak">-</span></div>
   </section>
 
   <div id="alertBanner" style="display:none; position:fixed; top:10px; right:10px; background:var(--red); color:#fff; padding:12px 16px; border-radius:8px;"></div>
@@ -239,14 +268,56 @@ document.getElementById("closeAllBtn").onclick = async () => {
 document.getElementById("saveSettingsBtn").onclick = saveSettings;
 
 function showPanel(id) {
-  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel"].forEach(p => {
+  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel"].forEach(p => {
     document.getElementById(p).style.display = (p === id) ? "block" : "none";
   });
 }
 document.getElementById("navPositionMgr").onclick = () => { showPanel("positionMgrPanel"); };
 document.getElementById("navAnalytics").onclick = () => { showPanel("analyticsPanel"); loadAnalytics(); };
-document.getElementById("navAlerts").onclick = () => { showPanel("alertsPanel"); loadAlerts(); };
+document.getElementById("navAlerts").onclick = () => { showPanel("alertsPanel"); loadAlerts(); loadBlackouts(); };
 document.getElementById("navWatchlist").onclick = () => { showPanel("watchlistPanel"); loadWatchlist(); };
+document.getElementById("navBacktest").onclick = () => { showPanel("backtestPanel"); };
+
+document.getElementById("runBacktestBtn").onclick = async () => {
+  const params = new URLSearchParams({
+    symbol: document.getElementById("btSymbol").value,
+    timeframe: document.getElementById("btTf").value,
+    strategy: document.getElementById("btStrategy").value,
+    bars: document.getElementById("btBars").value,
+    initial_equity: document.getElementById("btEquity").value,
+  });
+  const res = await fetch(`/api/backtest?${params}`);
+  const data = await res.json();
+  document.getElementById("btWinRate").textContent = data.stats.win_rate + "%";
+  document.getElementById("btProfitFactor").textContent = data.stats.profit_factor;
+  document.getElementById("btTradeCount").textContent = data.deals.length;
+  document.getElementById("btStreak").textContent = data.stats.current_streak;
+};
+
+async function loadBlackouts() {
+  const res = await fetch("/api/blackouts");
+  const rows = await res.json();
+  const body = document.getElementById("blackoutsBody");
+  body.innerHTML = "";
+  rows.forEach(b => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${b.start}</td><td>${b.end}</td><td>${b.label}</td><td><button data-id="${b.id}">Delete</button></td>`;
+    tr.querySelector("button").onclick = async () => {
+      await fetch(`/api/blackouts/${b.id}`, { method: "DELETE" });
+      loadBlackouts();
+    };
+    body.appendChild(tr);
+  });
+}
+document.getElementById("addBlackoutBtn").onclick = async () => {
+  await fetch("/api/blackouts", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      start: document.getElementById("boStart").value,
+      end: document.getElementById("boEnd").value,
+      label: document.getElementById("boLabel").value,
+    }) });
+  loadBlackouts();
+};
 
 async function loadWatchlist() {
   const res = await fetch("/api/watchlist");

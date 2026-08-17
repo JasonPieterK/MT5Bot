@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import analytics
 import alerts
+import backtest
 import config
 import engine
 import journal
@@ -24,6 +25,8 @@ _next_alert_id = 1
 watchlist = []
 manual_signals = []
 _next_watchlist_id = 1
+blackout_windows = []
+_next_blackout_id = 1
 
 _engine_thread = None
 _stop_flag = threading.Event()
@@ -205,15 +208,50 @@ def toggle_watchlist(entry_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/blackouts", methods=["GET"])
+def get_blackouts():
+    return jsonify(blackout_windows)
+
+
+@app.route("/api/blackouts", methods=["POST"])
+def post_blackout():
+    global _next_blackout_id
+    data = request.get_json()
+    entry = {"id": _next_blackout_id, "start": data["start"], "end": data["end"], "label": data.get("label", "")}
+    _next_blackout_id += 1
+    blackout_windows.append(entry)
+    return jsonify(entry)
+
+
+@app.route("/api/blackouts/<int:entry_id>", methods=["DELETE"])
+def delete_blackout(entry_id):
+    blackout_windows[:] = [b for b in blackout_windows if b["id"] != entry_id]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/backtest")
+def get_backtest():
+    symbol = request.args.get("symbol", state["symbol"])
+    timeframe = request.args.get("timeframe", state["timeframe"])
+    strategy = request.args.get("strategy", state["active_strategy"])
+    bars = int(request.args.get("bars", 200))
+    initial_equity = float(request.args.get("initial_equity", 10000))
+    rates = bridge.get_rates(symbol, timeframe, bars)
+    result = backtest.run_backtest(rates, strategy, strategy_settings[strategy], global_settings, initial_equity)
+    return jsonify(result)
+
+
 def _engine_loop():
     while not _stop_flag.is_set():
         if state.get("watchlist_enabled", False):
             engine.run_watchlist_once(bridge, watchlist, strategy_settings, global_settings,
-                                       0.0, 0.0, alert_rules, triggered_alerts, manual_signals)
+                                       0.0, 0.0, alert_rules, triggered_alerts, manual_signals,
+                                       blackout_windows=blackout_windows)
         else:
             engine.run_once(bridge, state, strategy_settings, global_settings,
                              daily_pnl_percent=0.0, drawdown_percent=0.0,
-                             alert_rules=alert_rules, triggered_alerts=triggered_alerts)
+                             alert_rules=alert_rules, triggered_alerts=triggered_alerts,
+                             blackout_windows=blackout_windows)
         time.sleep(5)
 
 

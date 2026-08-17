@@ -15,6 +15,7 @@ def client(monkeypatch):
     app_module.triggered_alerts.clear()
     app_module.watchlist.clear()
     app_module.manual_signals.clear()
+    app_module.blackout_windows.clear()
     app_module.app.config["TESTING"] = True
     yield app_module.app.test_client()
     app_module._stop_flag.set()
@@ -141,3 +142,28 @@ def test_status_includes_watchlist_and_manual_signals(client):
     body = resp.get_json()
     assert "watchlist" in body
     assert "manual_signals" in body
+
+
+def test_blackout_crud(client):
+    resp = client.post("/api/blackouts", json={"start": "2026-09-05T12:25:00+00:00",
+                                                 "end": "2026-09-05T12:35:00+00:00", "label": "NFP"})
+    assert resp.status_code == 200
+    entry = resp.get_json()
+    list_resp = client.get("/api/blackouts")
+    assert len(list_resp.get_json()) == 1
+    client.delete(f"/api/blackouts/{entry['id']}")
+    assert client.get("/api/blackouts").get_json() == []
+
+
+def test_backtest_endpoint(client):
+    import pandas as pd
+    price = 1.10
+    rows = []
+    for i in range(40):
+        price += 0.0008 if i % 2 == 0 else -0.0006
+        rows.append({"open": price, "high": price + 0.0005, "low": price - 0.0005, "close": price})
+    app_module.bridge.get_rates.return_value = pd.DataFrame(rows)
+    resp = client.get("/api/backtest?symbol=EURUSD&timeframe=M5&strategy=trend&bars=40&initial_equity=10000")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "stats" in body
