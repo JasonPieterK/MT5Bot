@@ -51,30 +51,28 @@ If not, install from [python.org](https://www.python.org/downloads/) — check "
 
 ## Install
 
-1. Clone the repository (PowerShell or Command Prompt):
+The installer is interactive — it handles cloning, Python/Git checks, and the virtual environment for you. You don't need to manually `git clone` first.
 
-```bash
-git clone https://github.com/JasonPieterK/MT5Bot.git
-cd MT5Bot
-```
+1. Get `MT5 BOT INSTALLER.bat` onto your machine — either:
+   - Clone the repo yourself first (PowerShell or Command Prompt):
+     ```bash
+     git clone https://github.com/JasonPieterK/MT5Bot.git
+     cd MT5Bot
+     ```
+     then double-click `MT5 BOT INSTALLER.bat`, **or**
+   - Download just that one file from the repo and double-click it anywhere — it clones the rest for you.
+2. Double-click **`MT5 BOT INSTALLER.bat`**. Choose **`[1] Install`**.
+3. **A folder picker dialog opens — choose where MT5 Bot should live.** It defaults to suggesting `%USERPROFILE%\MT5 Bot` (i.e. `C:\Users\<you>\MT5 Bot`), but pick anywhere you like — that folder is where the repo gets cloned and where the app runs from.
+4. If Git or Python 3.11+ aren't found, the installer offers to install them for you (via `winget`), or shows manual download links if you'd rather do it yourself.
+5. It clones the repo into your chosen folder, creates a `venv/` virtual environment inside it, and installs everything from `requirements.txt`.
+6. At the end it asks: **Add a desktop shortcut?** Say yes and a "MT5 Bot" shortcut appears on your Desktop, pointing at `start.bat` in your install folder — double-click it any time to launch the app without reopening the installer.
 
-2. Run the installer:
-
-```bash
-install.bat
-```
-
-This creates a `venv/` virtual environment and installs everything in `requirements.txt` into it. Takes a minute or two.
+Re-running the installer later and choosing **`[2] Update`** pulls the latest version from GitHub in place — your logs, saved settings, journal notes, and trained ML weights are preserved (the venv is kept too, dependencies just get refreshed). **`[4] Uninstall`** removes the install folder and the desktop shortcut completely; it never touches your MT5 account or broker.
 
 ## First run
 
 1. **Open your MT5 terminal and log into an account** (demo, for now). Leave it running.
-2. Start the bot:
-
-```bash
-start.bat
-```
-
+2. Start the bot — double-click the desktop shortcut, or run `start.bat` directly from your install folder.
 3. Your browser should open to `http://127.0.0.1:7500` — if not, open it manually.
 4. You'll land on the main dashboard. If the terminal is connected, **Equity** in the top-left card shows your real account balance within a couple seconds.
 
