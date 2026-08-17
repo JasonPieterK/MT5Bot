@@ -1,0 +1,6 @@
+MetaTrader5==5.0.6090
+Flask==3.0.3
+pandas==2.2.2
+numpy==1.26.4
+pytest==8.2.0
+pytest-mock==3.14.0

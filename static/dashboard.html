@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MT5 Bot</title>
+<style>
+  :root { --bg:#0f1216; --panel:#171b21; --border:#262b33; --text:#e6e9ef; --muted:#8b93a1; --accent:#3ea6ff; --green:#3ecf6e; --red:#ff5c5c; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:16px; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--border); }
+  header h1 { font-size:16px; margin:0; }
+  select, input, button { background:#1f242c; color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 10px; }
+  button { cursor:pointer; transition:background .15s; }
+  button:hover { background:#2a313c; }
+  #autoBtn.on { background:var(--green); color:#04210f; }
+  #autoBtn.off { background:var(--red); color:#2a0000; }
+  main { display:grid; grid-template-columns: 260px 1fr; gap:16px; padding:16px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .stat { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .tab { padding:6px 10px; border-radius:6px; cursor:pointer; background:#1f242c; font-size:12px; }
+  .tab.active { background:var(--accent); color:#00101c; }
+  .settings-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:6px; border-bottom:1px solid var(--border); }
+  .row-actions { display:flex; gap:8px; margin-top:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MT5 BOT</h1>
+  <select id="symbolSelect"><option>EURUSD</option><option>GBPUSD</option><option>XAUUSD</option><option>USDJPY</option></select>
+  <select id="tfSelect"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
+  <select id="strategySelect">
+    <option value="trend">Trend</option>
+    <option value="scalping">Scalping</option>
+    <option value="smc">SMC</option>
+    <option value="grid">Grid</option>
+    <option value="pivot_breakout">Pivot Breakout</option>
+  </select>
+  <button id="autoBtn" class="off">AUTO: OFF</button>
+  <button id="closeAllBtn">Close All</button>
+</header>
+<main>
+  <section class="panel">
+    <h3>Live Stats</h3>
+    <div class="stat"><span>Equity</span><span id="statEquity">-</span></div>
+    <div class="stat"><span>Open Positions</span><span id="statPositions">-</span></div>
+    <div class="stat"><span>Active Strategy</span><span id="statStrategy">-</span></div>
+    <div class="stat"><span>Symbol / TF</span><span id="statSymbolTf">-</span></div>
+  </section>
+  <section class="panel">
+    <h3>Strategy Settings</h3>
+    <div class="tabs" id="tabs"></div>
+    <div class="settings-grid" id="settingsGrid"></div>
+    <div class="row-actions"><button id="saveSettingsBtn">Save Settings</button></div>
+    <h3 style="margin-top:20px;">Open Positions</h3>
+    <table>
+      <thead><tr><th>Ticket</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Profit</th></tr></thead>
+      <tbody id="positionsBody"></tbody>
+    </table>
+  </section>
+</main>
+<script>
+const STRATEGIES = ["trend", "scalping", "smc", "grid", "pivot_breakout"];
+let currentTab = "trend";
+
+async function refreshStatus() {
+  const res = await fetch("/api/status");
+  const data = await res.json();
+  document.getElementById("statEquity").textContent = data.equity.toFixed(2);
+  document.getElementById("statPositions").textContent = data.positions.length;
+  document.getElementById("statStrategy").textContent = data.active_strategy;
+  document.getElementById("statSymbolTf").textContent = `${data.symbol} / ${data.timeframe}`;
+  const btn = document.getElementById("autoBtn");
+  btn.textContent = "AUTO: " + (data.auto_enabled ? "ON" : "OFF");
+  btn.className = data.auto_enabled ? "on" : "off";
+  document.getElementById("symbolSelect").value = data.symbol;
+  document.getElementById("tfSelect").value = data.timeframe;
+  document.getElementById("strategySelect").value = data.active_strategy;
+
+  const body = document.getElementById("positionsBody");
+  body.innerHTML = "";
+  data.positions.forEach(p => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.ticket}</td><td>${p.symbol}</td><td>${p.type}</td><td>${p.volume}</td><td>${p.profit}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function renderTabs() {
+  const tabs = document.getElementById("tabs");
+  tabs.innerHTML = "";
+  STRATEGIES.forEach(s => {
+    const el = document.createElement("div");
+    el.className = "tab" + (s === currentTab ? " active" : "");
+    el.textContent = s;
+    el.onclick = () => { currentTab = s; renderTabs(); renderSettingsForm(); };
+    tabs.appendChild(el);
+  });
+}
+
+async function renderSettingsForm() {
+  const grid = document.getElementById("settingsGrid");
+  grid.innerHTML = "<div>loading...</div>";
+  const res = await fetch(`/api/settings?strategy=${currentTab}`);
+  const settings = await res.json();
+  grid.innerHTML = "";
+  Object.entries(settings).forEach(([key, value]) => {
+    const field = document.createElement("div");
+    field.className = "field";
+    const isBool = typeof value === "boolean";
+    field.innerHTML = `<label>${key}</label>` +
+      (isBool
+        ? `<select data-key="${key}"><option value="true" ${value ? "selected" : ""}>true</option><option value="false" ${!value ? "selected" : ""}>false</option></select>`
+        : `<input data-key="${key}" value="${value}">`);
+    grid.appendChild(field);
+  });
+}
+
+async function saveSettings() {
+  const inputs = document.querySelectorAll("#settingsGrid [data-key]");
+  const settings = {};
+  inputs.forEach(el => {
+    const key = el.dataset.key;
+    let val = el.value;
+    if (val === "true") val = true;
+    else if (val === "false") val = false;
+    else if (!isNaN(val) && val.trim() !== "") val = Number(val);
+    settings[key] = val;
+  });
+  await fetch("/api/settings", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ strategy: currentTab, settings }) });
+  renderSettingsForm();
+}
+
+document.getElementById("symbolSelect").onchange = async (e) => {
+  await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ symbol: e.target.value }) });
+  refreshStatus();
+};
+document.getElementById("tfSelect").onchange = async (e) => {
+  await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ timeframe: e.target.value }) });
+  refreshStatus();
+};
+document.getElementById("strategySelect").onchange = async (e) => {
+  await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ strategy: e.target.value }) });
+  currentTab = e.target.value;
+  renderTabs();
+  renderSettingsForm();
+  refreshStatus();
+};
+document.getElementById("autoBtn").onclick = async () => {
+  const isOn = document.getElementById("autoBtn").classList.contains("on");
+  await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ enabled: !isOn }) });
+  refreshStatus();
+};
+document.getElementById("closeAllBtn").onclick = async () => {
+  await fetch("/api/close_all", { method: "POST" });
+  refreshStatus();
+};
+document.getElementById("saveSettingsBtn").onclick = saveSettings;
+
+renderTabs();
+renderSettingsForm();
+refreshStatus();
+setInterval(refreshStatus, 2000);
+</script>
+</body>
+</html>
