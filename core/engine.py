@@ -6,8 +6,12 @@ from datetime import datetime, timezone
 
 import automation.alerts as alerts
 import automation.news_filter as news_filter
+import core.correlation as correlation
+import core.htf_filter as htf_filter
 import core.risk_manager as rm
+import core.session_filter as session_filter
 import automation.trailing_manager as trailing_manager
+import analysis.volatility_regime as volatility_regime
 from strategies import trend, scalping, smc, grid, pivot_breakout
 
 STRATEGY_MODULES = {
@@ -51,6 +55,43 @@ def _manage_positions(bridge, global_settings, alert_rules, triggered_alerts):
         triggered_alerts.append({"id": "margin", "type": "margin", "message": "margin level below threshold"})
 
 
+def _passes_signal_filters(bridge, symbol, timeframe, signal, rates_df, global_settings, open_positions):
+    if global_settings.get("session_filter_enabled", False):
+        now_hour = datetime.now(timezone.utc).hour
+        if not session_filter.in_session(now_hour, global_settings.get("session_start_hour", 0),
+                                          global_settings.get("session_end_hour", 23)):
+            return False
+
+    if global_settings.get("correlation_filter_enabled", False):
+        if not correlation.check_correlation_allowed(
+                open_positions, symbol, global_settings.get("correlation_max_positions", 2)):
+            return False
+
+    if global_settings.get("htf_filter_enabled", False):
+        htf_rates = bridge.get_rates(symbol, global_settings.get("htf_timeframe", "H1"), 60)
+        bias = htf_filter.get_bias(htf_rates)
+        if not htf_filter.signal_matches_bias(signal, bias):
+            return False
+
+    if global_settings.get("volatility_regime_filter_enabled", False):
+        if volatility_regime.classify_regime(rates_df) == "HIGH":
+            return False
+
+    return True
+
+
+def _calc_confidence(bridge, symbol, entry, sl, tp, global_settings):
+    confidence = 1.0
+    if global_settings.get("confidence_sizing_enabled", False):
+        confidence *= rm.calc_confidence(entry, sl, tp)
+    if global_settings.get("streak_sizing_enabled", False):
+        from datetime import timedelta
+        recent = bridge.get_history_deals(datetime.now(timezone.utc) - timedelta(days=2))
+        results = [d["profit"] for d in recent[-10:]]
+        confidence *= rm.calc_streak_multiplier(results)
+    return confidence
+
+
 def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percent, drawdown_percent,
              alert_rules=None, triggered_alerts=None, blackout_windows=None):
     open_positions = bridge.get_open_positions(state["symbol"])
@@ -66,10 +107,9 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
 
     strategy_name = state["active_strategy"]
     if strategy_name == "grid":
+        rates = bridge.get_rates(state["symbol"], state["timeframe"], 60)
         signal, sl, tp = grid.get_signal(
-            bridge.get_rates(state["symbol"], state["timeframe"], 60),
-            strategy_settings["grid"],
-            current_grid_levels=len(open_positions),
+            rates, strategy_settings["grid"], current_grid_levels=len(open_positions),
         )
     else:
         module = STRATEGY_MODULES[strategy_name]
@@ -80,6 +120,10 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         return
 
     if news_filter.is_blackout_active(datetime.now(timezone.utc), blackout_windows or []):
+        return
+
+    if not _passes_signal_filters(bridge, state["symbol"], state["timeframe"], signal, rates,
+                                   global_settings, open_positions):
         return
 
     allowed, reason = rm.check_trade_allowed(
@@ -94,10 +138,12 @@ def run_once(bridge, state, strategy_settings, global_settings, daily_pnl_percen
         return
 
     equity = bridge.get_account_equity()
-    sl_distance = abs(bridge.get_rates(state["symbol"], state["timeframe"], 1)["close"].iloc[-1] - sl)
+    entry_price = bridge.get_rates(state["symbol"], state["timeframe"], 1)["close"].iloc[-1]
+    sl_distance = abs(entry_price - sl)
+    confidence = _calc_confidence(bridge, state["symbol"], entry_price, sl, tp, global_settings)
     lots = rm.calc_lot_size(
         equity=equity, risk_percent=global_settings["risk_percent"],
-        sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001,
+        sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
     )
 
     ok, retcode = bridge.place_order(
@@ -142,6 +188,10 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
         return
 
     open_positions = bridge.get_open_positions()
+
+    if not _passes_signal_filters(bridge, symbol, timeframe, signal, rates, global_settings, open_positions):
+        return
+
     allowed, reason = rm.check_trade_allowed(
         open_position_count=len(open_positions),
         max_concurrent_trades=global_settings["max_concurrent_trades"],
@@ -154,10 +204,12 @@ def _run_watchlist_entry(bridge, entry, strategy_settings, global_settings,
         return
 
     equity = bridge.get_account_equity()
-    sl_distance = abs(bridge.get_rates(symbol, timeframe, 1)["close"].iloc[-1] - sl)
+    entry_price = bridge.get_rates(symbol, timeframe, 1)["close"].iloc[-1]
+    sl_distance = abs(entry_price - sl)
+    confidence = _calc_confidence(bridge, symbol, entry_price, sl, tp, global_settings)
     lots = rm.calc_lot_size(
         equity=equity, risk_percent=global_settings["risk_percent"],
-        sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001,
+        sl_distance_price=sl_distance, pip_value_per_lot=10, point=0.0001, confidence=confidence,
     )
     ok, retcode = bridge.place_order(symbol, signal, lots, sl=sl, tp=tp,
                                       slippage_points=global_settings["slippage_points"])

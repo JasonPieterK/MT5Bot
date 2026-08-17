@@ -53,6 +53,16 @@ GLOBAL_SETTINGS = {
     "breakeven_trigger_points": 100,
     "breakeven_offset_points": 10,
     "margin_alert_level_percent": 100.0,
+    "correlation_filter_enabled": False,
+    "correlation_max_positions": 2,
+    "htf_filter_enabled": False,
+    "htf_timeframe": "H1",
+    "volatility_regime_filter_enabled": False,
+    "confidence_sizing_enabled": False,
+    "streak_sizing_enabled": False,
+    "session_filter_enabled": False,
+    "session_start_hour": 0,
+    "session_end_hour": 23,
 }
 
 

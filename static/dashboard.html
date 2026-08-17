@@ -46,6 +46,7 @@
   <button id="navAlerts">Alerts</button>
   <button id="navWatchlist">Watchlist</button>
   <button id="navBacktest">Backtest</button>
+  <button id="navSignalFilters">Signal Filters</button>
 </header>
 <main>
   <section class="panel">
@@ -158,6 +159,30 @@
     <div class="stat"><span>Profit Factor</span><span id="btProfitFactor">-</span></div>
     <div class="stat"><span>Trades</span><span id="btTradeCount">-</span></div>
     <div class="stat"><span>Current Streak</span><span id="btStreak">-</span></div>
+  </section>
+
+  <section class="panel" id="signalFiltersPanel" style="display:none; grid-column: span 2;">
+    <h3>Signal Filters (all opt-in, off by default)</h3>
+    <div class="settings-grid">
+      <div class="field" title="Only trade within these UTC hours"><label>Session Filter Enabled</label>
+        <select id="sfSessionEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>Session Start Hour (UTC)</label><input id="sfSessionStart" value="0"></div>
+      <div class="field"><label>Session End Hour (UTC)</label><input id="sfSessionEnd" value="23"></div>
+      <div class="field" title="Cap positions in correlated pairs (e.g. EURUSD/GBPUSD)"><label>Correlation Filter Enabled</label>
+        <select id="sfCorrEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>Max Correlated Positions</label><input id="sfCorrMax" value="2"></div>
+      <div class="field" title="Block signals that fight the higher-timeframe trend"><label>HTF Bias Filter Enabled</label>
+        <select id="sfHtfEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field"><label>HTF Timeframe</label>
+        <select id="sfHtfTf"><option>H1</option><option>M15</option></select></div>
+      <div class="field" title="Skip entries when volatility is in the top third of recent history"><label>Volatility Regime Filter Enabled</label>
+        <select id="sfVolEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field" title="Scale position size by reward:risk ratio"><label>Confidence Sizing Enabled</label>
+        <select id="sfConfEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+      <div class="field" title="Shrink position size after consecutive losses"><label>Streak (Anti-Martingale) Sizing Enabled</label>
+        <select id="sfStreakEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+    </div>
+    <div class="row-actions"><button id="saveSignalFiltersBtn">Save</button></div>
   </section>
 
   <div id="alertBanner" style="display:none; position:fixed; top:10px; right:10px; background:var(--red); color:#fff; padding:12px 16px; border-radius:8px;"></div>
@@ -309,10 +334,26 @@ document.getElementById("closeAllBtn").onclick = async () => {
 document.getElementById("saveSettingsBtn").onclick = saveSettings;
 
 function showPanel(id) {
-  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel"].forEach(p => {
+  ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel"].forEach(p => {
     document.getElementById(p).style.display = (p === id) ? "block" : "none";
   });
 }
+document.getElementById("navSignalFilters").onclick = () => { showPanel("signalFiltersPanel"); };
+document.getElementById("saveSignalFiltersBtn").onclick = async () => {
+  await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      session_filter_enabled: document.getElementById("sfSessionEnabled").value === "true",
+      session_start_hour: Number(document.getElementById("sfSessionStart").value),
+      session_end_hour: Number(document.getElementById("sfSessionEnd").value),
+      correlation_filter_enabled: document.getElementById("sfCorrEnabled").value === "true",
+      correlation_max_positions: Number(document.getElementById("sfCorrMax").value),
+      htf_filter_enabled: document.getElementById("sfHtfEnabled").value === "true",
+      htf_timeframe: document.getElementById("sfHtfTf").value,
+      volatility_regime_filter_enabled: document.getElementById("sfVolEnabled").value === "true",
+      confidence_sizing_enabled: document.getElementById("sfConfEnabled").value === "true",
+      streak_sizing_enabled: document.getElementById("sfStreakEnabled").value === "true",
+    }) });
+};
 document.getElementById("navPositionMgr").onclick = () => { showPanel("positionMgrPanel"); };
 document.getElementById("navAnalytics").onclick = () => { showPanel("analyticsPanel"); loadAnalytics(); };
 document.getElementById("navAlerts").onclick = () => { showPanel("alertsPanel"); loadAlerts(); loadBlackouts(); };
