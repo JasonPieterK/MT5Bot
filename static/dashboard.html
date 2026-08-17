@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>MT5 Bot</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 <link rel="stylesheet" href="/static/mmm-tokens.css">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 <style>
@@ -19,8 +20,7 @@
     flex-wrap: wrap;
   }
   .logo { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:900; font-size:20px; letter-spacing:-0.02em; color:var(--fg-1); }
-  .logo .mark { display:inline-flex; gap:3px; }
-  .logo .mark span { width:12px; height:12px; border:2px solid var(--ink); border-radius:50%; }
+  .logo img { display:block; border-radius:var(--r-sm); }
   .nav-controls { display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; }
   .nav-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left: var(--s-2); }
   .nav-spacer { flex: 1 1 auto; }
@@ -117,7 +117,7 @@
 </head>
 <body>
 <header class="mmm-nav">
-  <div class="logo"><span class="mark"><span style="background:var(--mean)"></span><span style="background:var(--median)"></span><span style="background:var(--mode)"></span></span>MT5 Bot.</div>
+  <div class="logo"><img src="/static/logo.svg" alt="" width="32" height="32">MT5 Bot.</div>
 
   <div class="nav-controls">
     <input id="symbolSelect" list="symbolList" value="EURUSD" style="width:110px;" autocomplete="off">

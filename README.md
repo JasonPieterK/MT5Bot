@@ -1,3 +1,5 @@
+<img src="static/logo.svg" width="64" height="64" alt="MT5 Bot logo">
+
 # MT5 Bot
 
 Multi-strategy automated trading robot for MetaTrader 5, with a local web dashboard. Python + Flask + the `MetaTrader5` package — no MQL5 required.
