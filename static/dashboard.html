@@ -83,6 +83,12 @@
       <button id="savePositionMgrBtn">Save</button>
       <button id="applyAllBtn">Apply Now to All Positions</button>
     </div>
+    <h3 style="margin-top:16px;">Trading Lock (local passcode, optional)</h3>
+    <div class="row-actions">
+      <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" id="lockEnabled"> Enabled</label>
+      <input id="lockPasscode" placeholder="passcode" style="width:120px;">
+      <button id="saveLockBtn">Save</button>
+    </div>
   </section>
 
   <section class="panel" id="analyticsPanel" style="display:none; grid-column: span 2;">
@@ -115,6 +121,9 @@
 
   <section class="panel" id="watchlistPanel" style="display:none; grid-column: span 2;">
     <h3>Watchlist (multi-symbol)</h3>
+    <div class="row-actions">
+      <button id="wlModeBtn" class="off">WATCHLIST MODE: OFF</button>
+    </div>
     <div class="row-actions">
       <input id="wlSymbol" placeholder="GBPUSD" style="width:90px;">
       <select id="wlTf"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
@@ -203,6 +212,23 @@ function renderTabs() {
   });
 }
 
+const FIELD_TOOLTIPS = {
+  risk_percent: "% of account equity risked per trade",
+  fast_period: "Fast moving average lookback period",
+  slow_period: "Slow moving average lookback period",
+  max_spread_points: "Skip entries when spread exceeds this many points",
+  sl_atr_multiple: "Stop-loss distance as a multiple of ATR",
+  tp_atr_multiple: "Take-profit distance as a multiple of ATR",
+  rsi_buy_below: "Only buy when RSI is below this value",
+  rsi_sell_above: "Only sell when RSI is above this value",
+  swing_lookback: "Bars on each side to confirm a swing high/low",
+  min_risk_reward: "Minimum reward:risk ratio required to enter",
+  grid_step_points: "Distance in points between grid levels",
+  max_concurrent_trades: "Maximum open positions allowed at once",
+  daily_loss_limit_percent: "Stop opening new trades once daily loss exceeds this %",
+  max_drawdown_percent: "Flatten all positions if drawdown exceeds this %",
+};
+
 async function renderSettingsForm() {
   const grid = document.getElementById("settingsGrid");
   grid.innerHTML = "<div>loading...</div>";
@@ -212,8 +238,9 @@ async function renderSettingsForm() {
   Object.entries(settings).forEach(([key, value]) => {
     const field = document.createElement("div");
     field.className = "field";
+    field.title = FIELD_TOOLTIPS[key] || key;
     const isBool = typeof value === "boolean";
-    field.innerHTML = `<label>${key}</label>` +
+    field.innerHTML = `<label title="${field.title}">${key}</label>` +
       (isBool
         ? `<select data-key="${key}"><option value="true" ${value ? "selected" : ""}>true</option><option value="false" ${!value ? "selected" : ""}>false</option></select>`
         : `<input data-key="${key}" value="${value}">`);
@@ -257,11 +284,25 @@ document.getElementById("strategySelect").onchange = async (e) => {
 };
 document.getElementById("autoBtn").onclick = async () => {
   const isOn = document.getElementById("autoBtn").classList.contains("on");
-  await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ enabled: !isOn }) });
+  if (!isOn) {
+    if (!confirm("Enable live auto-trading?")) return;
+    const status = await (await fetch("/api/status")).json();
+    let passcode;
+    if (status.lock_enabled) {
+      passcode = prompt("Enter trading lock passcode");
+      if (passcode === null) return;
+    }
+    const resp = await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled: true, passcode }) });
+    if (resp.status === 403) { alert("Wrong passcode."); return; }
+  } else {
+    await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled: false }) });
+  }
   refreshStatus();
 };
 document.getElementById("closeAllBtn").onclick = async () => {
+  if (!confirm("Close ALL open positions?")) return;
   await fetch("/api/close_all", { method: "POST" });
   refreshStatus();
 };
@@ -320,6 +361,11 @@ document.getElementById("addBlackoutBtn").onclick = async () => {
 };
 
 async function loadWatchlist() {
+  const status = await (await fetch("/api/status")).json();
+  const modeBtn = document.getElementById("wlModeBtn");
+  modeBtn.textContent = "WATCHLIST MODE: " + (status.watchlist_enabled ? "ON" : "OFF");
+  modeBtn.className = status.watchlist_enabled ? "on" : "off";
+
   const res = await fetch("/api/watchlist");
   const entries = await res.json();
   const body = document.getElementById("watchlistBody");
@@ -340,7 +386,6 @@ async function loadWatchlist() {
     body.appendChild(tr);
   });
 
-  const status = await (await fetch("/api/status")).json();
   const sigBody = document.getElementById("manualSignalsBody");
   sigBody.innerHTML = "";
   (status.manual_signals || []).forEach(s => {
@@ -372,7 +417,35 @@ document.getElementById("savePositionMgrBtn").onclick = async () => {
     }) });
 };
 document.getElementById("applyAllBtn").onclick = async () => {
+  if (!confirm("Apply trailing/break-even now to ALL open positions?")) return;
   await fetch("/api/position_manager/apply_all", { method: "POST" });
+};
+document.getElementById("saveLockBtn").onclick = async () => {
+  await fetch("/api/lock", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      enabled: document.getElementById("lockEnabled").checked,
+      passcode: document.getElementById("lockPasscode").value,
+    }) });
+};
+document.getElementById("wlModeBtn").onclick = async () => {
+  const btn = document.getElementById("wlModeBtn");
+  const isOn = btn.classList.contains("on");
+  if (!isOn) {
+    if (!confirm("Enable watchlist auto-trading mode? (replaces single-symbol Auto)")) return;
+    const status = await (await fetch("/api/status")).json();
+    let passcode;
+    if (status.lock_enabled) {
+      passcode = prompt("Enter trading lock passcode");
+      if (passcode === null) return;
+    }
+    const resp = await fetch("/api/watchlist_mode", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled: true, passcode }) });
+    if (resp.status === 403) { alert("Wrong passcode."); return; }
+  } else {
+    await fetch("/api/watchlist_mode", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ enabled: false }) });
+  }
+  loadWatchlist();
 };
 
 async function loadAnalytics() {

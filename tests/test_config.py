@@ -29,3 +29,8 @@ def test_new_watchlist_entry_shape():
     entry = config.new_watchlist_entry(1, "EURUSD", "M5", "trend", "auto")
     assert entry == {"id": 1, "symbol": "EURUSD", "timeframe": "M5",
                       "strategy": "trend", "mode": "auto", "enabled": True}
+
+def test_state_lock_defaults():
+    state = config.new_state()
+    assert state["lock_enabled"] is False
+    assert state["lock_passcode"] == ""

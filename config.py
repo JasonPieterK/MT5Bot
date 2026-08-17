@@ -63,6 +63,8 @@ def new_state():
         "timeframe": "M5",
         "auto_enabled": False,
         "watchlist_enabled": False,
+        "lock_enabled": False,
+        "lock_passcode": "",
     }
 
 

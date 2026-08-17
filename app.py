@@ -51,7 +51,15 @@ def status():
         "triggered_alerts": triggered_alerts,
         "watchlist": watchlist,
         "manual_signals": manual_signals,
+        "watchlist_enabled": state["watchlist_enabled"],
+        "lock_enabled": state["lock_enabled"],
     })
+
+
+def _check_lock(passcode):
+    if not state.get("lock_enabled", False):
+        return True
+    return passcode == state.get("lock_passcode", "")
 
 
 @app.route("/api/select", methods=["POST"])
@@ -99,6 +107,8 @@ def set_global_settings():
 @app.route("/api/auto", methods=["POST"])
 def auto():
     data = request.get_json()
+    if data["enabled"] and not _check_lock(data.get("passcode")):
+        return jsonify({"ok": False, "error": "locked"}), 403
     state["auto_enabled"] = bool(data["enabled"])
     global _engine_thread
     if state["auto_enabled"] and (_engine_thread is None or not _engine_thread.is_alive()):
@@ -239,6 +249,40 @@ def get_backtest():
     rates = bridge.get_rates(symbol, timeframe, bars)
     result = backtest.run_backtest(rates, strategy, strategy_settings[strategy], global_settings, initial_equity)
     return jsonify(result)
+
+
+@app.route("/api/lock", methods=["POST"])
+def set_lock():
+    data = request.get_json()
+    state["lock_enabled"] = bool(data["enabled"])
+    state["lock_passcode"] = data.get("passcode", "")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/watchlist_mode", methods=["POST"])
+def set_watchlist_mode():
+    data = request.get_json()
+    if data["enabled"] and not _check_lock(data.get("passcode")):
+        return jsonify({"ok": False, "error": "locked"}), 403
+    state["watchlist_enabled"] = bool(data["enabled"])
+    return jsonify({"ok": True})
+
+
+@app.route("/api/analytics/export")
+def export_analytics():
+    from datetime import datetime, timedelta
+    from flask import Response
+    import csv
+    import io
+    from_date = datetime.now() - timedelta(days=30)
+    deals = bridge.get_history_deals(from_date)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=["ticket", "symbol", "profit", "time"])
+    writer.writeheader()
+    for d in deals:
+        writer.writerow(d)
+    return Response(buf.getvalue(), mimetype="text/csv",
+                     headers={"Content-Disposition": "attachment; filename=analytics_export.csv"})
 
 
 def _engine_loop():

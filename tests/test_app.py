@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
+import config
 import app as app_module
 
 
@@ -9,8 +10,7 @@ def client(monkeypatch):
     app_module.bridge.get_open_positions.return_value = []
     app_module.bridge.get_account_equity.return_value = 10000
     app_module.bridge.get_margin_level.return_value = 500.0
-    app_module.state = {"active_strategy": "trend", "symbol": "EURUSD",
-                         "timeframe": "M5", "auto_enabled": False}
+    app_module.state = config.new_state()
     app_module.alert_rules.clear()
     app_module.triggered_alerts.clear()
     app_module.watchlist.clear()
@@ -167,3 +167,55 @@ def test_backtest_endpoint(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert "stats" in body
+
+
+def test_auto_blocked_when_locked_and_wrong_passcode(client):
+    app_module.state["lock_enabled"] = True
+    app_module.state["lock_passcode"] = "1234"
+    resp = client.post("/api/auto", json={"enabled": True, "passcode": "wrong"})
+    assert resp.status_code == 403
+    assert app_module.state["auto_enabled"] is False
+
+
+def test_auto_allowed_when_locked_and_correct_passcode(client):
+    app_module.state["lock_enabled"] = True
+    app_module.state["lock_passcode"] = "1234"
+    resp = client.post("/api/auto", json={"enabled": True, "passcode": "1234"})
+    assert resp.status_code == 200
+    assert app_module.state["auto_enabled"] is True
+
+
+def test_auto_off_never_blocked_by_lock(client):
+    app_module.state["lock_enabled"] = True
+    app_module.state["lock_passcode"] = "1234"
+    app_module.state["auto_enabled"] = True
+    resp = client.post("/api/auto", json={"enabled": False})
+    assert resp.status_code == 200
+    assert app_module.state["auto_enabled"] is False
+
+
+def test_post_lock_sets_state(client):
+    resp = client.post("/api/lock", json={"enabled": True, "passcode": "9999"})
+    assert resp.status_code == 200
+    assert app_module.state["lock_enabled"] is True
+    assert app_module.state["lock_passcode"] == "9999"
+
+
+def test_watchlist_mode_toggle_respects_lock(client):
+    app_module.state["lock_enabled"] = True
+    app_module.state["lock_passcode"] = "1234"
+    resp = client.post("/api/watchlist_mode", json={"enabled": True, "passcode": "wrong"})
+    assert resp.status_code == 403
+    resp = client.post("/api/watchlist_mode", json={"enabled": True, "passcode": "1234"})
+    assert resp.status_code == 200
+    assert app_module.state["watchlist_enabled"] is True
+
+
+def test_analytics_export_returns_csv(client):
+    app_module.bridge.get_history_deals.return_value = [
+        {"ticket": 1, "symbol": "EURUSD", "profit": 10.0, "time": 1},
+    ]
+    resp = client.get("/api/analytics/export")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.content_type
+    assert "ticket" in resp.get_data(as_text=True)
