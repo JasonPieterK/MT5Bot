@@ -4,12 +4,30 @@ import automation.watchdog as watchdog
 
 def test_check_connection_true_when_connected():
     bridge = MagicMock()
-    bridge.connect.return_value = True
+    bridge.is_connected.return_value = True
     assert watchdog.check_connection(bridge) is True
 
 
-def test_check_connection_false_when_disconnected():
+def test_check_connection_does_not_reinitialise_when_already_connected():
+    # connect() is mt5.initialize(): expensive, and with no args it can silently re-attach
+    # to a different terminal than the one the user picked. It must not run every tick.
     bridge = MagicMock()
+    bridge.is_connected.return_value = True
+    watchdog.check_connection(bridge)
+    bridge.connect.assert_not_called()
+
+
+def test_check_connection_reconnects_when_disconnected():
+    bridge = MagicMock()
+    bridge.is_connected.return_value = False
+    bridge.connect.return_value = True
+    assert watchdog.check_connection(bridge) is True
+    bridge.connect.assert_called_once()
+
+
+def test_check_connection_false_when_disconnected_and_reconnect_fails():
+    bridge = MagicMock()
+    bridge.is_connected.return_value = False
     bridge.connect.return_value = False
     assert watchdog.check_connection(bridge) is False
 

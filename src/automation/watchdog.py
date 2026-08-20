@@ -6,7 +6,12 @@ import json
 
 
 def check_connection(bridge):
-    return bridge.connect()
+    """Health check, not a connection attempt. Only reconnects when actually disconnected --
+    calling connect() every tick added real latency and could re-point the bot at a
+    different terminal/account than the one selected in the Accounts tab."""
+    if bridge.is_connected():
+        return True
+    return bool(bridge.connect())
 
 
 def notify_webhook(webhook_url, message):

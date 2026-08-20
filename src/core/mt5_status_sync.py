@@ -27,13 +27,25 @@ def write_status_file(status, directory=None):
 
 
 def build_status(state, equity, open_position_count):
+    # equity <= 0 means the terminal isn't connected, not that the account is wiped out --
+    # reporting a 100% drawdown there would paint the panel red for a connection blip.
+    peak = max(float(state.get("peak_equity") or 0.0), equity)
+    drawdown_percent = ((peak - equity) / peak * 100) if (peak > 0 and equity > 0) else 0.0
     return {
-        "auto_enabled": 1 if state.get("auto_enabled") else 0,
-        "watchlist_enabled": 1 if state.get("watchlist_enabled") else 0,
+        # Kept as two fields for the EA's existing schema, but both derive from the one
+        # trading_mode so they can never disagree.
+        "auto_enabled": 1 if state.get("trading_mode") == "single" else 0,
+        "watchlist_enabled": 1 if state.get("trading_mode") == "watchlist" else 0,
+        # The mode verbatim, so the panel prints what the app actually is rather than
+        # reconstructing it from the two booleans above.
+        "trading_mode": state.get("trading_mode", "off"),
         "active_strategy": state.get("active_strategy", ""),
         "symbol": state.get("symbol", ""),
         "timeframe": state.get("timeframe", ""),
         "equity": round(equity, 2),
+        # The one risk number worth a chart row, and free here: peak_equity is already
+        # tracked in state by the drawdown kill-switch.
+        "drawdown_percent": round(drawdown_percent, 2),
         "open_positions": open_position_count,
         "last_update_unix": int(time.time()),
     }

@@ -2,391 +2,936 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MT5 Bot</title>
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
-<link rel="stylesheet" href="/static/mmm-tokens.css">
+<link rel="stylesheet" href="/static/mt5-tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;700;800;900&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 <style>
   * { box-sizing: border-box; }
-  body { margin:0; }
+  body { margin:0; background:var(--bg-2); }
 
-  /* ---------- Top nav ---------- */
-  header.mmm-nav {
-    position: sticky; top: 0; z-index: 100;
-    display: flex; align-items: center; gap: var(--s-4);
-    padding: 10px var(--s-5); min-height: var(--nav-h);
-    background: rgba(253,252,247,0.85); backdrop-filter: blur(16px);
-    border-bottom: var(--bw) solid var(--ink);
-    flex-wrap: wrap;
+  /* ---------- App shell: nav rail + main column ---------- */
+  .app-layout { display:flex; gap:var(--s-4); align-items:flex-start; max-width:var(--maxw-wide); margin:0 auto; padding:var(--s-4); }
+  .app-main { flex:1; min-width:0; }
+
+  /* ---------- Nav rail (left sidebar — section switcher, tiered by importance) ---------- */
+  .nav-rail {
+    flex-shrink:0; width:206px;
+    display:flex; flex-direction:column; gap:2px;
+    background:var(--paper); border:var(--bw) solid var(--border); border-radius:var(--r-lg);
+    padding:10px; position:sticky; top:var(--s-4);
+    max-height:calc(100vh - var(--s-6)); overflow-y:auto; overscroll-behavior:contain;
+    box-shadow:var(--sh-soft);
   }
-  .logo { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:900; font-size:20px; letter-spacing:-0.02em; color:var(--fg-1); }
+  .rail-tab {
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left; min-width:0;
+    font-family:var(--font-body); font-weight:600; font-size:13px; letter-spacing:0.01em;
+    padding:9px 12px; border:none; border-radius:var(--r-sm);
+    background:transparent; color:var(--fg-2); cursor:pointer;
+    transition:background var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+  }
+  .rail-tab i { font-size:16px; flex-shrink:0; }
+  .rail-tab span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rail-tab:hover { color:var(--fg-1); background:var(--graphite-3); }
+  .rail-tab.on { background:var(--amber); color:var(--fg-inv); font-weight:700; }
+  .rail-tab.on i { color:var(--fg-inv); }
+  .rail-group {
+    font-family:var(--font-body); font-size:10px; font-weight:700; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--fg-2); opacity:0.65;
+    padding:12px 12px 5px; margin-top:2px;
+    border-top:1px solid var(--border-soft);
+  }
+  .rail-group:first-child { border-top:none; margin-top:0; padding-top:4px; }
+  .rail-danger-zone { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .rail-divider { height:1px; background:var(--border-soft); margin:6px 4px; }
+  @media (max-width: 980px) {
+    /* align-items:flex-start makes column-flex children shrink-to-fit on the cross
+       axis, so a wide card used to stretch .app-main past the viewport. */
+    .app-layout { flex-direction:column; align-items:stretch; padding:var(--s-3); }
+    .app-main { width:100%; max-width:100%; }
+    .nav-rail { width:100%; flex-direction:row; flex-wrap:wrap; align-items:center; position:static; max-height:none; overflow:visible; }
+    .rail-tab { width:auto; white-space:nowrap; }
+    .rail-group { border-top:none; padding:6px 4px; width:100%; }
+    .rail-danger-zone { margin-top:0; padding-top:0; border-top:none; width:100%; }
+  }
+
+  /* ---------- Header (literal logo + status-pill + quick-action controls) ---------- */
+  .header { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s-4); margin-bottom:var(--s-4); flex-wrap:wrap; }
+  .logo { display:flex; align-items:center; gap:10px; }
   .logo img { display:block; border-radius:var(--r-sm); }
-  .nav-group { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
-  .nav-group-label { color:var(--fg-2) !important; }
-  .nav-controls { display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; }
-  .nav-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .nav-spacer { flex: 1 1 auto; }
-  .nav-danger-zone { display:flex; align-items:center; gap:8px; padding-left:var(--s-3); border-left: var(--bw-thin) solid var(--border-soft); }
+  .logo-title { font-family:var(--font-display); font-weight:900; font-size:22px; letter-spacing:-0.02em; color:var(--fg-1); line-height:1; }
+  .logo-tag { font-family:var(--font-body); font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-2); display:block; }
+  .header-controls { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; min-width:0; }
+  .header-controls-group { display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; min-width:0; }
+  .header-danger-group { display:flex; align-items:center; gap:8px; padding-left:var(--s-3); border-left:var(--bw-thin) solid var(--border-soft); }
+  select#symbolSelect, input#symbolSelect { width:110px; max-width:100%; }
 
-  /* ---------- Chips (nav tabs / status) ---------- */
-  .chip {
-    display:inline-flex; align-items:center; gap:6px;
-    font-family:var(--font-display); font-weight:700; font-size:13px;
-    padding:8px 14px; background:var(--bg-1); color:var(--fg-1);
-    border:var(--bw) solid var(--ink); border-radius:var(--r-pill);
-    box-shadow:var(--sh-1); cursor:pointer;
-    transition: transform var(--dur-micro) var(--ease-bounce), box-shadow var(--dur-micro) var(--ease-bounce);
+  /* ---------- Status pill ---------- */
+  .status-pill { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:12px; padding:8px 16px; border:var(--bw) solid; border-radius:var(--r-pill); }
+  .status-pill.connected { border-color:var(--mode); color:var(--mode); background:var(--mode-50); }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:currentColor; animation:pulse-dot 2s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ---------- Account bar (persistent live-stats strip, literal MT5 Manager pattern) ---------- */
+  .account-bar { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:var(--s-3); margin-bottom:var(--s-4); }
+  .acct-card { background:var(--graphite-2); border:var(--bw) solid var(--border); border-radius:var(--r-md); padding:10px 14px; min-width:0; }
+  .acct-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--fg-2); margin-bottom:4px; }
+  .acct-val { font-family:var(--font-mono); font-size:16px; font-weight:700; color:var(--fg-1); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+
+  /* ---------- Account identity (header) + history badges ---------- */
+  .acct-identity { display:flex; flex-direction:column; gap:2px; padding-left:var(--s-3); margin-left:var(--s-3); border-left:var(--bw-thin) solid var(--border-soft); min-width:0; }
+  .acct-id-login { font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--fg-1); font-variant-numeric:tabular-nums; }
+  .acct-id-meta { font-family:var(--font-body); font-size:11px; color:var(--fg-2); overflow-wrap:anywhere; }
+  .acct-badge { align-self:flex-start; font-family:var(--font-body); font-size:9px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; padding:2px 7px; border-radius:var(--r-pill); background:var(--graphite-3); color:var(--fg-2); border:var(--bw-thin) solid var(--border); }
+  .acct-badge.is-real { background:var(--amber); color:var(--fg-inv); border-color:var(--amber); }
+  .acct-badge.is-off { color:var(--danger); border-color:var(--danger); }
+  .type-badge { font-family:var(--font-body); font-size:10px; font-weight:800; letter-spacing:0.06em; padding:2px 7px; border-radius:var(--r-pill); border:var(--bw-thin) solid; }
+  .type-badge.is-buy { color:var(--buy); border-color:var(--buy); }
+  .type-badge.is-sell { color:var(--sell); border-color:var(--sell); }
+  tfoot .total-row td { font-weight:800; border-top:var(--bw) solid var(--border); background:var(--graphite-3); }
+  @media (max-width: 560px) { .acct-identity { padding-left:0; margin-left:0; border-left:none; } }
+
+  /* ---------- Panel grid: sidebar + main-panel ---------- */
+  .panel-grid { display:grid; grid-template-columns:minmax(0,300px) minmax(0,1fr); gap:var(--s-4); align-items:start; margin-bottom:var(--s-4); }
+  @media (max-width: 900px) { .panel-grid { grid-template-columns:minmax(0,1fr); } }
+  /* Card stacks that have no fixed sidebar: pack them across the width instead of running
+     one card per row down a long scroll. Settings used to render every card inside the 300px
+     .sidebar column of a .panel-grid whose second column held nothing at all -- 300px of
+     content beside 990px of dead space. min() keeps the track from exceeding the viewport,
+     so this collapses to a single column on a phone without a media query. */
+  .card-columns { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+    gap:var(--s-4); align-items:start; margin-bottom:var(--s-4); }
+  .card-columns > * { min-width:0; }
+  /* Dashboard: four stacked sidebar cards ran to 1729px against a 747px main column, so the
+     page scrolled for no reason other than the sidebar being one card wide. Given the room,
+     pack them two-up instead. align-items:start stops a short card being stretched to match
+     a tall neighbour. */
+  @media (min-width: 1400px) {
+    #dashboardPanel { grid-template-columns:minmax(0, 600px) minmax(0, 1fr); }
+    #dashboardPanel > .sidebar {
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+      align-content:start; align-items:start;
+    }
+    #dashboardPanel > .sidebar > * { min-width:0; }
   }
-  .chip:hover { transform:translate(-1px,-2px); box-shadow:var(--sh-2); }
-  .chip:active { transform:translate(1px,1px); box-shadow:var(--sh-1); }
-  .chip.on { background:var(--median); color:var(--paper); }
-  .chip.status-off { background:var(--bone); color:var(--fg-2); }
-  .chip.status-live { background:var(--danger); color:var(--paper); animation: pulse-live 1.6s var(--ease-out) infinite; }
-  .chip.danger { background:var(--danger); color:var(--paper); }
-  .chip:disabled, .chip.is-loading { opacity:0.5; cursor:not-allowed; transform:none !important; }
+  .sidebar { display:flex; flex-direction:column; gap:var(--s-4); min-width:0; }
+  .main-panel { display:flex; flex-direction:column; gap:var(--s-4); min-width:0; }
+
+  /* ---------- Card ---------- */
+  .card { background:var(--paper); border:var(--bw) solid var(--border); border-radius:var(--r-lg); box-shadow:var(--sh-soft); min-width:0; max-width:100%; }
+  .card-head { background:var(--graphite-3); padding:10px 14px; border-bottom:var(--bw) solid var(--border); display:flex; align-items:center; gap:8px; flex-wrap:wrap; border-radius:calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0; }
+  .card-head-title { font-family:var(--font-display); font-weight:700; font-size:13px; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; min-width:0; overflow-wrap:anywhere; }
+  .card-head i { color:var(--fg-2); font-size:15px; flex-shrink:0; }
+  .card-head-note { font-family:var(--font-body); font-weight:400; font-size:11px; color:var(--fg-2); }
+  .card-body { padding:var(--s-4); min-width:0; }
+  .card-body p.hint { font-family:var(--font-body); font-size:var(--fs-small); color:var(--fg-2); margin:0 0 var(--s-3); max-width:none; }
+  .card-body h4.sub { font-size:13px; font-weight:700; font-family:var(--font-display); margin:var(--s-5) 0 var(--s-3); display:flex; align-items:center; gap:8px; color:var(--fg-1); }
+
+  /* ---------- Trade-table-wrap (wraps the positions/log/etc tables) ---------- */
+  .trade-table-wrap { background:var(--paper); border:var(--bw) solid var(--border); border-radius:var(--r-lg); box-shadow:var(--sh-soft); min-width:0; max-width:100%; }
+  .trade-table-head { background:var(--graphite-3); padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:var(--bw) solid var(--border); border-radius:calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0; }
+  .trade-table-head i { color:var(--fg-2); }
+  .trade-table-body { padding:var(--s-4); min-width:0; }
+
+  /* ---------- Chips (nav-adjacent status controls) ---------- */
+  .chip {
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    font-family:var(--font-body); font-weight:700; font-size:13px; line-height:1.2;
+    padding:8px 14px; background:var(--graphite-3); color:var(--fg-1);
+    border:var(--bw) solid var(--border); border-radius:var(--r-sm);
+    box-shadow:var(--sh-1); cursor:pointer; min-width:0;
+    transition: background var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out);
+  }
+  .chip:hover { background:var(--steel); box-shadow:var(--sh-2); }
+  .chip.on { background:var(--amber); color:var(--fg-inv); border-color:var(--amber); }
+  .chip.status-off { background:var(--graphite-3); color:var(--fg-2); border-color:var(--border); }
+  .chip.status-live { background:var(--amber); color:var(--fg-inv); border-color:var(--amber); animation: pulse-live 1.8s var(--ease-out) infinite; }
+  .chip.danger { background:transparent; color:var(--danger); border-color:var(--danger); }
+  .chip.danger:hover { background:var(--danger); color:#fff; }
+  .chip:disabled, .chip.is-loading { opacity:0.45; cursor:not-allowed; }
   select:disabled, input:disabled { opacity:0.4; cursor:not-allowed; }
-  @keyframes pulse-live { 0%,100% { box-shadow:var(--sh-1); } 50% { box-shadow:0 0 0 6px rgba(255,107,74,0.25), var(--sh-1); } }
-  .icon-btn { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border:var(--bw) solid var(--ink); border-radius:var(--r-pill); background:var(--bg-1); cursor:pointer; box-shadow:var(--sh-1); transition: transform var(--dur-micro) var(--ease-bounce); }
-  .icon-btn:hover { transform: rotate(-8deg) scale(1.05); }
-
-  /* ---------- Layout ---------- */
-  main { display:grid; grid-template-columns: 320px 1fr; gap:var(--s-5); padding:var(--s-5); max-width:var(--maxw-wide); margin:0 auto; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding:var(--s-3); } header.mmm-nav { padding:10px var(--s-3); } }
-
-  .mmm-card.panel { display:block; }
-  .mmm-card.panel.span2 { grid-column: 1 / -1; }
-  .mmm-card:nth-of-type(3n) { transform: rotate(-0.4deg); }
-  .mmm-card:nth-of-type(3n+1) { transform: rotate(0.35deg); }
-  .mmm-card:nth-of-type(3n+2) { transform: rotate(-0.2deg); }
-  .mmm-card:hover { transform: rotate(0deg); }
+  @keyframes pulse-live { 0%,100% { box-shadow:0 0 0 0 rgba(245,165,36,0.45); } 70% { box-shadow:0 0 0 7px rgba(245,165,36,0); } }
 
   .panel h3 { font-size:var(--fs-h4); margin-bottom:var(--s-3); display:flex; align-items:center; gap:8px; }
-  .panel h4.sub { font-size:15px; font-weight:700; font-family:var(--font-display); margin:var(--s-5) 0 var(--s-3); display:flex; align-items:center; gap:8px; }
-  .panel p.hint { font-family:var(--font-body); font-size:var(--fs-small); color:var(--fg-2); margin:0 0 var(--s-3); }
 
-  /* ---------- Stats ---------- */
+  /* ---------- Stats (legacy .stat rows, still used inside a couple cards) ---------- */
   .stat { display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:var(--bw-thin) solid var(--border-soft); }
   .stat:last-child { border-bottom:none; }
   .stat .label { font-family:var(--font-body); font-weight:700; font-size:var(--fs-micro); letter-spacing:var(--tracking-caps); text-transform:uppercase; color:var(--fg-2); }
-  .stat .value { font-family:var(--font-mono); font-weight:700; font-size:20px; color:var(--fg-1); font-variant-numeric: tabular-nums; }
+  .stat .value { font-family:var(--font-mono); font-weight:700; font-size:18px; color:var(--fg-1); font-variant-numeric: tabular-nums; }
 
   /* ---------- Tabs (strategy settings) ---------- */
   .tabs { display:flex; gap:6px; margin-bottom:var(--s-3); flex-wrap:wrap; }
-  .tab { padding:6px 12px; border-radius:var(--r-pill); cursor:pointer; background:var(--bone); font-family:var(--font-body); font-weight:700; font-size:13px; border:var(--bw-thin) solid var(--border-soft); transition: all var(--dur-micro) var(--ease-bounce); }
-  .tab.active { background:var(--mode); border-color:var(--ink); color:var(--ink); }
+  .tab { padding:6px 11px; border-radius:var(--r-sm); cursor:pointer; background:var(--graphite-3); color:var(--fg-2); font-family:var(--font-body); font-weight:700; font-size:12px; border:var(--bw-thin) solid var(--border); transition: all var(--dur-micro) var(--ease-out); }
+  .tab:hover { color:var(--fg-1); background:var(--steel); }
+  .tab.active { background:var(--amber); border-color:var(--amber); color:var(--fg-inv); }
 
   /* ---------- Forms ---------- */
-  .settings-grid { display:grid; grid-template-columns: 1fr 1fr; gap:var(--s-3); }
-  .field label { display:block; font-family:var(--font-body); font-weight:700; font-size:var(--fs-micro); color:var(--fg-2); margin-bottom:4px; letter-spacing:0.02em; }
-  .field input, .field select { width:100%; }
-  select, input { font-family:var(--font-body); background:var(--bg-1); color:var(--fg-1); border:var(--bw-thin) solid var(--ink); border-radius:var(--r-sm); padding:8px 10px; font-size:14px; }
-  select:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible, .chip:focus-visible, .tab:focus-visible { outline:3px solid var(--median); outline-offset:2px; }
+  /* auto-fit + minmax(0,…) is what stops the 2-col grid overflowing the 300px sidebar */
+  .settings-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap:var(--s-3); min-width:0; }
+  .settings-grid > * { min-width:0; }
+  .field { min-width:0; }
+  .field label { display:block; font-family:var(--font-body); font-weight:600; font-size:var(--fs-micro); color:var(--fg-2); margin-bottom:4px; letter-spacing:0.02em; line-height:1.35; overflow-wrap:anywhere; hyphens:auto; }
+  .field input, .field select { width:100%; min-width:0; max-width:100%; }
+  select, input, textarea { font-family:var(--font-body); background:var(--field); color:var(--fg-1); border:var(--bw-thin) solid var(--border); border-radius:var(--r-sm); padding:7px 9px; font-size:13px; max-width:100%; }
+  input::placeholder { color:var(--fg-2); opacity:0.55; }
+  select:hover, input:hover { border-color:var(--steel); }
+  input[type="checkbox"] { accent-color:var(--amber); width:15px; height:15px; }
+  select:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible, .chip:focus-visible, .tab:focus-visible, .rail-tab:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+  select:focus, input:focus { outline:none; border-color:var(--amber); }
 
-  /* ---------- Tables ---------- */
+  /* ---------- Tables — every table gets its own horizontal scroller ---------- */
+  .table-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
   table { width:100%; border-collapse:collapse; font-size:13px; font-family:var(--font-body); }
-  thead th { text-align:left; padding:8px; background:var(--bone); border-bottom:var(--bw-thin) solid var(--ink); font-weight:700; font-size:var(--fs-micro); text-transform:uppercase; letter-spacing:0.03em; color:var(--fg-2); }
+  thead th { text-align:left; padding:8px; background:var(--graphite-3); border-bottom:var(--bw-thin) solid var(--border); font-weight:700; font-size:var(--fs-micro); text-transform:uppercase; letter-spacing:0.03em; color:var(--fg-2); white-space:nowrap; }
   td { padding:8px; border-bottom:1px solid var(--border-soft); }
-  tbody tr:hover { background:var(--median-50); }
+  tbody tr:hover { background:var(--graphite-3); }
+  td.mono, .mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .pl-pos { color:var(--buy); }
+  .pl-neg { color:var(--sell); }
 
-  .row-actions { display:flex; gap:var(--s-2); margin-top:var(--s-3); flex-wrap:wrap; align-items:center; }
+  .row-actions { display:flex; gap:var(--s-2); margin-top:var(--s-3); flex-wrap:wrap; align-items:center; min-width:0; }
+  .row-actions > input, .row-actions > select { flex:0 1 auto; min-width:0; }
 
   /* ---------- Buttons (secondary sizes) ---------- */
-  .mmm-btn.sm { padding:8px 16px; font-size:14px; }
-  .mmm-btn .ph-bold, .chip .ph-bold { font-size:16px; }
-  .mmm-btn:disabled, .mmm-btn.is-loading { opacity:0.5; cursor:not-allowed; transform:none !important; box-shadow:var(--sh-1) !important; }
+  .mmm-btn.sm { padding:7px 13px; font-size:13px; }
+  .mmm-btn { max-width:100%; }
+  .mmm-btn .ph-bold, .chip .ph-bold { font-size:15px; flex-shrink:0; }
+  .mmm-btn:disabled, .mmm-btn.is-loading { opacity:0.5; cursor:not-allowed; filter:none !important; box-shadow:var(--sh-1) !important; }
 
   /* ---------- Modal ---------- */
-  .modal-overlay { position:fixed; inset:0; background:rgba(13,10,44,0.6); display:flex; align-items:center; justify-content:center; z-index:1000; padding:var(--s-4); }
-  .modal-card { background:var(--paper); border:var(--bw) solid var(--ink); border-radius:var(--r-lg); box-shadow:var(--sh-soft); padding:var(--s-5); max-width:420px; width:100%; animation: modal-in var(--dur-std) var(--ease-bounce); }
-  @keyframes modal-in { from { transform:scale(0.9) translateY(12px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
-  .modal-card h3 { margin-bottom:var(--s-2); display:flex; align-items:center; gap:8px; }
-  .modal-card p { font-size:15px; color:var(--fg-2); margin-bottom:var(--s-3); }
-  .modal-actions { display:flex; gap:var(--s-2); justify-content:flex-end; margin-top:var(--s-4); }
+  .modal-overlay { position:fixed; inset:0; background:rgba(9,10,13,0.78); display:flex; align-items:center; justify-content:center; z-index:2000; padding:var(--s-4); overflow-y:auto; }
+  .modal-card { background:var(--paper); border:1px solid var(--border); border-top:2px solid var(--amber); border-radius:var(--r-lg); box-shadow:0 20px 60px rgba(0,0,0,0.65); padding:var(--s-5); max-width:440px; width:100%; max-height:calc(100vh - var(--s-6)); overflow-y:auto; animation: modal-in var(--dur-std) var(--ease-out); }
+  @keyframes modal-in { from { transform:translateY(10px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  .modal-card h3 { margin-bottom:var(--s-2); display:flex; align-items:center; gap:8px; font-size:17px; overflow-wrap:anywhere; }
+  .modal-card p { font-size:14px; color:var(--fg-2); margin-bottom:var(--s-3); max-width:none; overflow-wrap:anywhere; }
+  .modal-actions { display:flex; gap:var(--s-2); justify-content:flex-end; margin-top:var(--s-4); flex-wrap:wrap; }
 
   /* ---------- Toast / alert banner ---------- */
-  #alertBanner { position:fixed; bottom:var(--s-5); right:var(--s-5); z-index:900; display:none; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-size:14px; background:var(--danger); color:var(--paper); border:var(--bw) solid var(--ink); border-radius:var(--r-md); box-shadow:var(--sh-3); padding:14px 18px; max-width:360px; opacity:0; transform:translateY(12px); transition: opacity var(--dur-std) var(--ease-out), transform var(--dur-std) var(--ease-out); }
+  #alertBanner { position:fixed; bottom:var(--s-5); right:var(--s-5); z-index:1500; display:none; align-items:flex-start; gap:10px; font-family:var(--font-body); font-weight:700; font-size:13px; background:var(--graphite-2); color:var(--fg-1); border:1px solid var(--border); border-left:3px solid var(--amber); border-radius:var(--r-md); box-shadow:var(--sh-4); padding:12px 16px; max-width:min(360px, calc(100vw - 2 * var(--s-5))); opacity:0; transform:translateY(12px); transition: opacity var(--dur-std) var(--ease-out), transform var(--dur-std) var(--ease-out); overflow-wrap:anywhere; }
   #alertBanner.show { display:flex; opacity:1; transform:translateY(0); }
+  #alertBanner i { color:var(--amber); flex-shrink:0; }
 
   /* ---------- Misc ---------- */
-  .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:var(--s-6) var(--s-4); color:var(--fg-2); font-size:14px; text-align:center; }
-  .empty-state .ph-bold { font-size:28px; color:var(--border-soft); }
-  .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.4); border-top-color:currentColor; border-radius:50%; animation: spin 0.7s linear infinite; }
+  /* max-width, because an empty state inside a .table-scroll otherwise sets the scroller's
+     width: on a 375px screen "no open positions" was 405px wide and had to be scrolled to
+     be read. The message must fit the screen even when the table it replaces does not. */
+  .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:var(--s-6) var(--s-4); color:var(--fg-2); font-size:14px; text-align:center; max-width:min(100%, 340px); margin-inline:auto; text-wrap:balance; }
+  .empty-state .ph-bold { font-size:26px; color:var(--steel); }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(230,232,236,0.25); border-top-color:currentColor; border-radius:50%; animation: spin 0.7s linear infinite; vertical-align:-2px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* confetti burst */
   .confetti-piece { position:fixed; z-index:1200; pointer-events:none; border-radius:2px; animation: confetti-fall 700ms var(--ease-out) forwards; }
   @keyframes confetti-fall { to { transform: translateY(80px) rotate(180deg); opacity:0; } }
+
+  /* ---------- Trading-mode segmented control (replaces the two independent toggles) ---------- */
+  .seg { display:inline-flex; gap:3px; padding:3px; background:var(--graphite-3); border:var(--bw-thin) solid var(--border); border-radius:var(--r-sm); }
+  .seg-btn {
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+    font-family:var(--font-body); font-weight:700; font-size:12px; line-height:1.2;
+    padding:7px 12px; border:none; border-radius:calc(var(--r-sm) - 2px);
+    background:transparent; color:var(--fg-2); cursor:pointer;
+    transition: background var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+  }
+  .seg-btn:hover { color:var(--fg-1); background:var(--steel); }
+  .seg-btn.on { background:var(--amber); color:var(--fg-inv); }
+  .seg-btn.on[data-mode="off"] { background:var(--steel); color:var(--fg-1); }
+  .seg-btn:disabled { opacity:0.45; cursor:not-allowed; }
+
+  /* Header single-symbol group is dimmed + badged when it is NOT what's being traded. */
+  .controls-idle { opacity:0.45; }
+  .idle-badge {
+    display:none; align-items:center; gap:5px; font-family:var(--font-body);
+    font-size:10px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--danger); border:1px solid var(--danger); border-radius:var(--r-pill); padding:4px 9px;
+  }
+
+  /* ---------- "What is actually being traded" strip ---------- */
+  .target-bar {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;
+    padding:10px 14px; margin-bottom:var(--s-4);
+    background:var(--graphite-2); border:var(--bw) solid var(--border);
+    border-left:3px solid var(--steel); border-radius:var(--r-md);
+    font-family:var(--font-body); font-size:13px; color:var(--fg-1); overflow-wrap:anywhere;
+  }
+  .target-bar.live { border-left-color:var(--amber); }
+  .target-bar i { color:var(--fg-2); font-size:16px; flex-shrink:0; }
+  .target-bar .target-what { font-family:var(--font-mono); font-weight:700; color:var(--fg-1); }
+  .target-bar .target-idle { color:var(--fg-2); }
+
+  /* ---------- Danger blocks: engine health + trading diagnostic ---------- */
+  /* display is toggled by JS to "flex" (never by a CSS class), same trap-avoidance as PANEL_DISPLAY. */
+  .alert-block {
+    display:none; align-items:flex-start; gap:12px; min-width:0;
+    padding:14px 16px; margin-bottom:var(--s-4);
+    background:var(--mean-50); border:var(--bw) solid var(--danger); border-left:4px solid var(--danger);
+    border-radius:var(--r-md); font-family:var(--font-body); font-size:13px; color:var(--fg-1);
+    overflow-wrap:anywhere;
+  }
+  .alert-block > i.ph-bold { color:var(--danger); font-size:20px; flex-shrink:0; }
+  .alert-block-main { flex:1; min-width:0; }
+  .alert-block h4 { font-family:var(--font-display); font-size:14px; font-weight:700; margin:0 0 6px; color:var(--danger); }
+  .alert-block p { margin:0 0 4px; color:var(--fg-1); }
+  .alert-block .alert-meta { color:var(--fg-2); font-family:var(--font-mono); font-size:11px; }
+  .finding { padding:9px 0; border-top:1px solid var(--border-soft); }
+  .finding:first-child { border-top:none; }
+  .finding-problem { font-weight:700; color:var(--fg-1); display:block; margin-bottom:3px; }
+  .finding-fix { color:var(--fg-2); display:block; }
+  .finding-fix::before { content:"Fix: "; color:var(--danger); font-weight:700; }
+  .alert-dismiss { background:transparent; border:none; color:var(--fg-2); cursor:pointer; font-size:17px; line-height:1; padding:2px 4px; flex-shrink:0; }
+  .alert-dismiss:hover { color:var(--fg-1); }
+
+
+  /* ---------- Diagnostic finding severity ----------
+     Not every finding blocks trading. An auto-resolved symbol rename is a note, and
+     painting it red next to "Algo Trading is off" is what made the log contradict itself. */
+  .alert-block.notes-only { background:var(--median-50); border-color:var(--amber); border-left-color:var(--amber); }
+  .alert-block.notes-only > i.ph-bold { color:var(--amber); }
+  .alert-block.notes-only h4 { color:var(--amber); }
+  .finding-sev {
+    display:inline-block; font-family:var(--font-body); font-size:9px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase; padding:2px 7px; border-radius:var(--r-pill);
+    margin-right:7px; vertical-align:1px; border:1px solid currentColor;
+  }
+  .finding-sev.sev-blocking { color:var(--danger); }
+  .finding-sev.sev-warning  { color:var(--amber); }
+  .finding-sev.sev-info     { color:var(--fg-2); }
+  .finding.sev-info .finding-fix::before { content:"Note: "; color:var(--fg-2); }
+  .finding.sev-warning .finding-fix::before { content:"Fix: "; color:var(--amber); }
+
+  /* ---------- "Why is it not opening a trade?" ---------- */
+  .why-headline {
+    display:flex; align-items:flex-start; gap:10px; min-width:0;
+    padding:12px 14px; border-radius:var(--r-md); margin-bottom:var(--s-3);
+    background:var(--graphite-3); border:var(--bw-thin) solid var(--border);
+    border-left:3px solid var(--steel); font-size:13px; color:var(--fg-1); overflow-wrap:anywhere;
+  }
+  .why-headline i { font-size:18px; flex-shrink:0; color:var(--fg-2); }
+  .why-headline.is-blocked { border-left-color:var(--danger); background:var(--mean-50); }
+  .why-headline.is-clear   { border-left-color:var(--mode); background:var(--mode-50); }
+  .why-headline.is-idle    { border-left-color:var(--amber); background:var(--median-50); }
+
+  .why-meta { font-family:var(--font-mono); font-size:11px; color:var(--fg-2); margin-bottom:var(--s-3); overflow-wrap:anywhere; }
+
+  .why-target {
+    border:var(--bw-thin) solid var(--border); border-radius:var(--r-md);
+    background:var(--graphite-2); margin-bottom:var(--s-3); min-width:0; overflow:hidden;
+  }
+  .why-target-head {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;
+    padding:9px 12px; background:var(--graphite-3); border-bottom:var(--bw-thin) solid var(--border);
+  }
+  .why-target-name { font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--fg-1); overflow-wrap:anywhere; }
+  .why-target-sub { font-size:11px; color:var(--fg-2); }
+  .why-target-body { padding:12px; min-width:0; }
+  .why-target-body p { margin:0 0 8px; font-size:13px; color:var(--fg-1); overflow-wrap:anywhere; }
+
+  .why-pill {
+    display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+    font-family:var(--font-body); font-size:10px; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; padding:4px 9px; border-radius:var(--r-pill);
+    border:1px solid currentColor; margin-left:auto;
+  }
+  .why-pill.p-blocked    { color:var(--danger); background:var(--mean-50); }
+  .why-pill.p-no_signal  { color:var(--fg-2); }
+  .why-pill.p-waiting_bar{ color:var(--fg-2); }
+  .why-pill.p-order_sent { color:var(--buy); background:var(--mode-50); }
+  .why-pill.p-alert_only { color:var(--amber); background:var(--median-50); }
+  .why-pill.p-none       { color:var(--fg-2); }
+
+  .why-gate {
+    display:inline-block; font-family:var(--font-body); font-size:11px; font-weight:700;
+    color:var(--danger); border:1px solid var(--danger); border-radius:var(--r-sm);
+    padding:2px 8px; margin-bottom:8px;
+  }
+  .why-numbers {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+    gap:8px; margin:10px 0 0; min-width:0;
+  }
+  .why-num {
+    background:var(--graphite-3); border:var(--bw-thin) solid var(--border-soft);
+    border-radius:var(--r-sm); padding:7px 9px; min-width:0;
+  }
+  .why-num dt { font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--fg-2); margin:0 0 3px; overflow-wrap:anywhere; }
+  .why-num dd { margin:0; font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--fg-1); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  /* --sell/--buy mean loss and gain. "Lots needed" is not a loss and "lots allowed" is not
+     a gain -- they are two neutral quantities being compared, and painting them as P&L made
+     an informational readout look like an alarm. The binding constraint gets --amber, the
+     system's "look here" accent; red stays reserved for a state that really is blocking. */
+  .why-num.is-binding dd { color:var(--amber); }
+
+  .why-remedy {
+    display:flex; align-items:flex-start; gap:9px; min-width:0; margin-top:10px;
+    padding:10px 12px; border-radius:var(--r-sm);
+    background:var(--median-50); border:1px solid var(--amber);
+    font-size:13px; color:var(--fg-1); overflow-wrap:anywhere;
+  }
+  .why-remedy i { color:var(--amber); font-size:16px; flex-shrink:0; }
+  .why-remedy strong { color:var(--amber); }
+
+  /* ---------- Trading profile picker ---------- */
+  .profile-active {
+    padding:10px 12px; border-radius:var(--r-sm); margin-bottom:var(--s-3);
+    background:var(--graphite-3); border:var(--bw-thin) solid var(--border);
+    border-left:3px solid var(--amber); font-size:12px; color:var(--fg-1); overflow-wrap:anywhere;
+  }
+  .profile-active .profile-active-name { font-family:var(--font-display); font-weight:700; font-size:13px; display:block; margin-bottom:3px; }
+  .profile-risk { font-family:var(--font-mono); font-size:12px; color:var(--fg-1); overflow-wrap:anywhere; }
+  /* "requested vs actual" is a binding constraint, not a loss — amber, not red. Same rule
+     as .why-num.is-binding: red is reserved for a state that is genuinely blocking. */
+  .profile-risk .risk-binds { color:var(--amber); font-weight:700; }
+  .profile-desc { font-size:12px; color:var(--fg-2); margin:var(--s-3) 0 0; overflow-wrap:anywhere; }
+  .profile-changes { list-style:none; padding:0; margin:var(--s-3) 0 0; font-size:12px; }
+  .profile-changes li { display:flex; gap:8px; justify-content:space-between; padding:5px 0; border-top:1px solid var(--border-soft); min-width:0; }
+  .profile-changes li:first-child { border-top:none; }
+  .profile-changes .ch-label { color:var(--fg-2); overflow-wrap:anywhere; }
+  .profile-changes .ch-value { font-family:var(--font-mono); font-weight:700; color:var(--fg-1); white-space:nowrap; }
+  .profile-changes .ch-from { color:var(--fg-2); font-weight:400; }
+
+  /* A control Auto has taken over. The select is disabled rather than merely styled: a
+     picker that accepts a click and then changes nothing is worse than one that says no. */
+  .auto-lock-badge { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-body);
+    font-size:11px; font-weight:700; letter-spacing:.02em; color:var(--amber);
+    border:var(--bw-thin) solid var(--amber); border-radius:var(--r-sm); padding:2px 7px; white-space:nowrap; }
+  .auto-lock-badge[hidden] { display:none; }
+  select:disabled, input:disabled { opacity:.55; cursor:not-allowed; }
+
+  /* ---------- Auto mode card ---------- */
+  /* Evidence values are sentences ("smc 41, trend 12"), not single numbers, so they must be
+     allowed to wrap -- the profile picker's nowrap would push them out of the card at 375px. */
+  .auto-evidence .ch-value { white-space:normal; text-align:right; }
+  .auto-evidence li { align-items:baseline; }
+  .auto-state { border-left-color:var(--fg-2); }
+  .auto-state.is-on { border-left-color:var(--amber); }
+  .auto-caveat { border-left:3px solid var(--steel); padding-left:10px; }
+
+  /* data-tip tooltips are rendered by the JS #tipLayer (position:fixed) so that
+     nothing — sticky sidebar, card overflow, table scroller — can clip them.
+     Styles for #tipLayer live in mt5-tokens.css. */
+
+/* Preset caution. Amber is this system's "look here"; the red variant is reserved for the
+   tiers that also demand an explicit confirmation before they can be applied. */
+.profile-warning {
+  display: flex; gap: 8px; align-items: flex-start;
+  margin: 10px 0 0; padding: 9px 11px;
+  font-size: 12px; line-height: 1.5;
+  color: var(--amber);
+  background: rgba(245,165,36,0.08);
+  border: 1px solid rgba(245,165,36,0.35);
+  border-radius: var(--r-md);
+}
+.profile-warning i { flex-shrink: 0; margin-top: 1px; }
+.profile-warning.danger {
+  color: var(--sell);
+  background: rgba(239,68,68,0.09);
+  border-color: rgba(239,68,68,0.4);
+}
+
+/* Manual-order stop/target sliders. Fully left is "off", which is why the value label reads
+   a word rather than a number there -- "0.0x ATR" would look like a setting, not an absence. */
+.stop-slider { margin-bottom: 10px; }
+.stop-slider-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin-bottom: 4px;
+}
+.stop-slider-head label {
+  font-size: 12px; font-weight: 700; color: var(--fg-2);
+  border-bottom: 1px dotted var(--border); cursor: help;
+}
+.stop-slider-value {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--amber);
+}
+.stop-slider-value.off { color: var(--slate-text); }
+.stop-slider input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; margin: 0;
+  background: var(--graphite-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.stop-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--amber); border: 2px solid var(--graphite-1);
+  cursor: pointer;
+}
+.stop-slider input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--amber); border: 2px solid var(--graphite-1);
+  cursor: pointer; border-width: 2px;
+}
+.stop-slider input[type="range"]:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.stop-slider-note {
+  margin: 0 0 10px; font-size: 11px; line-height: 1.5; color: var(--slate-text);
+  min-height: 1em;
+}
+.stop-slider-note.warn { color: var(--sell); }
+.botstop-use {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: var(--fg-2);
+  margin-bottom: 12px; cursor: pointer;
+}
+.botstop-sliders { transition: opacity 140ms var(--ease-out); }
+
+/* Auto mode state. A single button reading "Enable Auto" is ambiguous -- it could be a
+   label for the current state or a description of what clicking does. A two-position
+   segmented control with the active side filled cannot be misread, and the pill in the
+   card head states it again in a word. */
+.auto-pill {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; padding: 2px 9px; border-radius: var(--r-pill);
+  border: 1px solid;
+}
+.auto-pill.is-off { color: var(--slate-text); border-color: var(--border); background: var(--graphite-3); }
+.auto-pill.is-on  { color: var(--graphite-1); border-color: var(--amber); background: var(--amber); }
+.auto-seg { margin-bottom: 0; }
+.auto-seg .seg-btn.on { background: var(--amber); border-color: var(--amber); color: var(--graphite-1); }
 </style>
 </head>
 <body>
-<header class="mmm-nav">
-  <div class="logo"><img src="/static/logo.svg" alt="" width="32" height="32">MT5 Bot.</div>
+<div class="app-layout">
 
-  <div class="nav-group">
-    <span class="eyebrow nav-group-label">Single-symbol trading</span>
-    <div class="nav-controls">
-      <input id="symbolSelect" list="symbolList" value="EURUSD" style="width:110px;" autocomplete="off">
-      <datalist id="symbolList">
-        <option value="EURUSD"><option value="GBPUSD"><option value="XAUUSD"><option value="USDJPY">
-      </datalist>
-      <select id="tfSelect" title="Chart timeframe the selected strategy analyzes"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
-      <select id="strategySelect" title="Strategy run by single-symbol Auto">
-        <option value="trend">Trend</option>
-        <option value="scalping">Scalping</option>
-        <option value="smc">SMC</option>
-        <option value="grid">Grid</option>
-        <option value="pivot_breakout">Pivot breakout</option>
-        <option value="ensemble">Ensemble (vote)</option>
-      </select>
-      <button id="autoBtn" class="chip status-off" title="Arms/disarms live auto-trading for the symbol+strategy selected here"><i class="ph-bold ph-power"></i>Auto: off</button>
-    </div>
-  </div>
+  <nav class="nav-rail" aria-label="Sections">
+    <button class="rail-tab on" id="railDashboard" onclick="showPanel('dashboardPanel')" data-tip="Home screen. What the bot is trading, why, the open positions, and a manual buy/sell."><i class="ph-bold ph-gauge"></i><span>Dashboard</span></button>
+    <button class="rail-tab" id="navHistory" data-tip="Every trade that has closed on this account: time, symbol, size, price, profit, commission and swap."><i class="ph-bold ph-clock-counter-clockwise"></i><span>History</span></button>
+    <button class="rail-tab" id="navWhyNoTrade" data-tip="The one screen that answers &quot;why is it not opening a trade?&quot;. Names the exact gate that refused each signal, shows the numbers behind it, and states the fix."><i class="ph-bold ph-question"></i><span>Why no trade?</span></button>
+    <button class="rail-tab" id="navSettings" data-tip="The everyday dials: risk per trade, lot caps, loss limits, and the automatic management of open positions."><i class="ph-bold ph-sliders"></i><span>Settings</span></button>
+    <button class="rail-tab" id="navAdvanced" data-tip="Signal filters and per-strategy parameters. A wrong value in here can silently stop the bot trading."><i class="ph-bold ph-funnel"></i><span>Advanced</span></button>
+    <button class="rail-tab" id="navLogs" data-tip="A plain-English, time-stamped record of everything the bot has done. Start here when something looks wrong."><i class="ph-bold ph-file-text"></i><span>Logs</span></button>
 
-  <div class="nav-group">
-    <span class="eyebrow nav-group-label">Views</span>
-    <div class="nav-tabs">
-    <button class="chip" id="navPositionMgr" title="Trailing stop / break-even / partial-TP automation, applies to every open position"><i class="ph-bold ph-sliders"></i>Position mgr</button>
-    <button class="chip" id="navAnalytics" title="Win rate, profit factor, equity curve, per-strategy breakdown"><i class="ph-bold ph-chart-line-up"></i>Analytics</button>
-    <button class="chip" id="navAlerts" title="Price/margin alerts and news blackout windows"><i class="ph-bold ph-bell"></i>Alerts</button>
-    <button class="chip" id="navWatchlist" title="Trade multiple symbols at once (overrides the single-symbol controls above when live)"><i class="ph-bold ph-eye"></i>Watchlist</button>
-    <button class="chip" id="navBacktest" title="Simulate a strategy against historical price data"><i class="ph-bold ph-clock-counter-clockwise"></i>Backtest</button>
-    <button class="chip" id="navSignalFilters" title="Optional filters that gate every strategy's entries (session, correlation, ML, etc.)"><i class="ph-bold ph-funnel"></i>Signal filters</button>
-    <button class="chip" id="navAccounts" title="Saved MT5 login profiles"><i class="ph-bold ph-identification-card"></i>Accounts</button>
-    <button class="chip" id="navLogs" title="Plain-English record of everything the bot has done"><i class="ph-bold ph-file-text"></i>Logs</button>
+    <div class="rail-danger-zone">
+      <button class="chip danger" id="closeAllBtn" style="width:100%;" data-tip="DANGER: instantly closes every open position on the account at the current market price. Cannot be undone."><i class="ph-bold ph-x-circle"></i>Close all</button>
     </div>
-  </div>
+  </nav>
 
-  <div class="nav-spacer"></div>
+  <div class="app-main">
 
-  <div class="nav-group">
-    <span class="eyebrow nav-group-label">Danger zone</span>
-    <div class="nav-danger-zone">
-      <button class="chip danger" id="closeAllBtn" title="Immediately market-closes every open position on the account"><i class="ph-bold ph-x-circle"></i>Close all</button>
-    </div>
-  </div>
+    <!-- Header: literal logo + quick-action controls pattern -->
+    <header class="header">
+      <div class="logo">
+        <img src="/static/logo.svg" alt="" width="32" height="32">
+        <div>
+          <span class="logo-tag">Auto-trading</span>
+          <span class="logo-title">MT5 Bot</span>
+        </div>
+        <div class="acct-identity" id="acctIdentity" data-tip="The MT5 account this bot is connected to. It uses whatever account the MT5 terminal is logged into — there is nothing to configure here.">
+          <span class="acct-id-login" id="acctLogin">-</span>
+          <span class="acct-id-meta"><span id="acctBroker">-</span> · <span id="acctCurrency">-</span></span>
+          <span class="acct-badge" id="acctBadge">-</span>
+        </div>
+      </div>
+      <div class="header-controls">
+        <div class="header-controls-group" id="singleSymbolGroup">
+          <input id="symbolSelect" list="symbolList" value="EURUSD" style="width:110px;" autocomplete="off" data-tip="The market the bot trades, e.g. EURUSD or XAUUSD. Type any symbol your broker offers.">
+          <!-- Populated from the broker's own tradeable symbols at load; the hardcoded names
+               were wrong for any broker using suffixes (XM lists EURUSD# and GOLD.i#). -->
+          <datalist id="symbolList"></datalist>
+          <select id="tfSelect" data-tip="Candle size the strategy looks at. M5 = one candle every 5 minutes. Smaller = more trades and more noise."><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
+          <select id="strategySelect" data-tip="Which trading method the bot uses. Trend follows moving averages, Scalping takes quick small moves, SMC uses market structure, Grid ladders orders, Ensemble makes the strategies vote.">
+            <option value="trend">Trend</option>
+            <option value="scalping">Scalping</option>
+            <option value="smc">SMC</option>
+            <option value="grid">Grid</option>
+            <option value="pivot_breakout">Pivot breakout</option>
+            <option value="ensemble">Ensemble (vote)</option>
+          </select>
+          <!-- Shown only while Auto is on, because the select above then reflects a choice
+               the user is not making. Hidden by default; renderAuto owns its visibility. -->
+          <span class="auto-lock-badge" id="strategyAutoBadge" hidden
+                data-tip="Auto mode is choosing the strategy on every engine check. Turn Auto off on the Auto mode card to choose it yourself."><i class="ph-bold ph-robot"></i>Auto</span>
+        </div>
+        <div class="header-controls-group">
+          <div class="seg" id="tradingModeSeg" role="group" aria-label="Trading mode" data-tip="The one switch that decides whether the bot trades, and what it trades. There is no second hidden switch.">
+            <button class="seg-btn on" id="modeOffBtn" data-mode="off" data-tip="Nothing is traded. The bot watches but places no orders. Open positions are still managed by the trailing / break-even rules."><i class="ph-bold ph-power"></i>Off</button>
+            <button class="seg-btn" id="modeSingleBtn" data-mode="single" data-tip="Trade the symbol, candle size and method chosen in the boxes to the left. Real orders, with no per-trade confirmation."><i class="ph-bold ph-crosshair"></i>Live</button>
+          </div>
+        </div>
+      </div>
+    </header>
 
-</header>
+    <!-- Engine health: only visible when the trading loop is erroring or has gone quiet -->
+    <div class="alert-block" id="engineHealthBanner" role="alert">
+      <i class="ph-bold ph-warning-octagon"></i>
+      <div class="alert-block-main">
+        <h4 id="engineHealthTitle">Trading engine problem</h4>
+        <p id="engineHealthText"></p>
+        <div class="alert-meta" id="engineHealthMeta"></div>
+      </div>
+      <button class="alert-dismiss" id="engineHealthDismiss" aria-label="Dismiss" data-tip="Hide this warning. It comes back on its own if the problem is still there a minute from now.">&times;</button>
+    </div>
 
-<main>
-  <section class="mmm-card panel">
-    <h3><i class="ph-bold ph-gauge"></i>Live stats</h3>
-    <div class="stat"><span class="label">Equity</span><span class="value" id="statEquity">-</span></div>
-    <div class="stat"><span class="label">Open positions</span><span class="value" id="statPositions">-</span></div>
-    <div class="stat"><span class="label">Active strategy</span><span class="value" id="statStrategy" style="font-size:15px;">-</span></div>
-    <div class="stat"><span class="label">Symbol / TF</span><span class="value" id="statSymbolTf" style="font-size:15px;">-</span></div>
-  </section>
+    <!-- Trading diagnostic: why the bot can't trade, asked of MT5 directly -->
+    <div class="alert-block" id="diagBanner" role="alert">
+      <i class="ph-bold ph-first-aid-kit"></i>
+      <div class="alert-block-main">
+        <h4 id="diagTitle">The bot cannot trade yet</h4>
+        <p id="diagIntro">MT5 was asked directly what is blocking trading. Fix these and no trades will be missed:</p>
+        <div id="diagFindings"></div>
+        <div class="alert-meta" id="diagMeta"></div>
+      </div>
+      <button class="alert-dismiss" id="diagDismiss" aria-label="Dismiss" data-tip="Hide this list. Run the diagnostic again any time from the Logs page or the button next to the trading-mode switch.">&times;</button>
+    </div>
 
-  <section class="mmm-card panel">
-    <h3><i class="ph-bold ph-slider-horizontal"></i>Strategy settings</h3>
-    <div class="tabs" id="tabs"></div>
-    <div class="settings-grid" id="settingsGrid"></div>
-    <div class="row-actions"><button class="mmm-btn sm" id="saveSettingsBtn" title="Apply these values to the strategy on its next tick, no restart needed"><i class="ph-bold ph-floppy-disk"></i>Save settings</button></div>
-    <h4 class="sub"><i class="ph-bold ph-list-bullets"></i>Open positions</h4>
-    <table>
-      <thead><tr><th>Ticket</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Profit</th><th>Note</th></tr></thead>
-      <tbody id="positionsBody"></tbody>
-    </table>
-  </section>
+    <!-- What is ACTUALLY being traded — always states it plainly, whatever the mode -->
+    <div class="target-bar" id="tradingTargetBar">
+      <i class="ph-bold ph-target"></i>
+      <span id="tradingTargetText" class="target-idle">Checking what the bot is trading…</span>
+      <button class="mmm-btn sm mmm-btn--ghost" id="runDiagHeaderBtn" style="margin-left:auto;" data-tip="Ask MT5 straight out why trades aren't opening — Algo Trading button off, read-only password, symbol not in Market Watch, market closed, and so on."><i class="ph-bold ph-first-aid-kit"></i>Run diagnostic</button>
+    </div>
 
-  <section class="mmm-card panel span2" id="positionMgrPanel" style="display:none;">
-    <h3><i class="ph-bold ph-sliders"></i>Position manager</h3>
-    <p class="hint">Applies to <strong>every</strong> open position on the account — not just trades this bot opened.</p>
-    <div class="settings-grid">
-      <div class="field"><label>Trailing enabled</label>
-        <select id="trailingEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Trailing distance (points)</label><input id="trailingDistance" value="100"></div>
-      <div class="field"><label>Break-even enabled</label>
-        <select id="beEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>BE trigger (points)</label><input id="beTrigger" value="100"></div>
-      <div class="field"><label>BE offset (points)</label><input id="beOffset" value="10"></div>
-      <div class="field"><label>Margin alert level %</label><input id="marginAlertLevel" value="100"></div>
-      <div class="field" title="Close part of the position early, move SL to breakeven on the rest"><label>Partial TP enabled</label>
-        <select id="partialTpEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Partial TP trigger (points)</label><input id="partialTpTrigger" value="100"></div>
-      <div class="field"><label>Partial TP close fraction</label><input id="partialTpFraction" value="0.5"></div>
-      <div class="field" title="Cap total $-at-risk across all open positions"><label>Portfolio risk filter enabled</label>
-        <select id="portRiskEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Max portfolio risk %</label><input id="portRiskMax" value="20"></div>
-      <div class="field" title="Block new entries near daily swap/rollover"><label>Swap filter enabled</label>
-        <select id="swapFilterEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Swap block hours before rollover</label><input id="swapBlockHours" value="1"></div>
-      <div class="field"><label>Rollover hour (UTC)</label><input id="swapRolloverHour" value="21"></div>
-      <div class="field" title="Flatten and stop new entries near weekly close"><label>Schedule filter enabled</label>
-        <select id="scheduleFilterEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Disable weekday (0=Mon..6=Sun)</label><input id="scheduleWeekday" value="4"></div>
-      <div class="field"><label>Disable hour (UTC)</label><input id="scheduleHour" value="21"></div>
-      <div class="field" title="POSTed on MT5 disconnect: Telegram bot API URL, Slack/Discord webhook, or any custom endpoint" style="grid-column:1/-1;"><label>Watchdog webhook URL</label>
-        <input id="watchdogWebhook" placeholder="https://..." style="width:100%;"></div>
+    <!-- Account strip: live from mt5.account_info(), persistent across every section -->
+    <div class="account-bar">
+      <div class="acct-card" data-tip="Closed money in the account, before the profit or loss of anything still open."><div class="acct-label">Balance</div><div class="acct-val" id="statBalance">-</div></div>
+      <div class="acct-card" data-tip="Your balance including the profit or loss of trades that are still open. This is the number that really matters."><div class="acct-label">Equity</div><div class="acct-val" id="statEquity">-</div></div>
+      <div class="acct-card" data-tip="Money not tied up as margin — what is available to open new positions with."><div class="acct-label">Free margin</div><div class="acct-val" id="statFreeMargin">-</div></div>
+      <div class="acct-card" data-tip="Profit or loss of every position that is open right now, across the whole account."><div class="acct-label">Open P&amp;L</div><div class="acct-val" id="statOpenPnl">-</div></div>
+      <div class="acct-card" data-tip="The broker server the terminal is logged into, and how many positions are open."><div class="acct-label">Server</div><div class="acct-val" id="statServer" style="font-size:13px;">-</div></div>
     </div>
-    <div class="row-actions">
-      <button class="mmm-btn sm" id="savePositionMgrBtn" title="Save all Position Manager settings above"><i class="ph-bold ph-floppy-disk"></i>Save</button>
-      <button class="mmm-btn sm mmm-btn--mean" id="applyAllBtn" title="Run trailing/break-even/partial-TP immediately instead of waiting for the next tick"><i class="ph-bold ph-lightning"></i>Apply now to all positions</button>
-      <button class="mmm-btn sm mmm-btn--ghost" id="saveStateBtn" title="Force-save settings to disk now (also happens automatically every engine tick)"><i class="ph-bold ph-archive-box"></i>Save state now</button>
-    </div>
-    <h4 class="sub"><i class="ph-bold ph-lock-key"></i>Trading lock (local passcode, optional)</h4>
-    <div class="row-actions">
-      <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px;"><input type="checkbox" id="lockEnabled"> Enabled</label>
-      <input id="lockPasscode" type="password" autocomplete="new-password" placeholder="passcode" style="width:140px;">
-      <button class="mmm-btn sm" id="saveLockBtn" title="Save the trading lock passcode"><i class="ph-bold ph-floppy-disk"></i>Save</button>
-    </div>
-  </section>
 
-  <section class="mmm-card panel span2" id="analyticsPanel" style="display:none;">
-    <h3><i class="ph-bold ph-chart-line-up"></i>Analytics <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— last 30 days, full account history</span></h3>
-    <div class="stat"><span class="label">Win rate</span><span class="value" id="statWinRate">-</span></div>
-    <div class="stat"><span class="label">Profit factor</span><span class="value" id="statProfitFactor">-</span></div>
-    <div class="stat"><span class="label">Current streak</span><span class="value" id="statStreak">-</span></div>
-    <div class="row-actions"><a class="mmm-btn sm mmm-btn--ghost" id="exportCsvLink" href="/api/analytics/export"><i class="ph-bold ph-download-simple"></i>Export CSV</a></div>
-    <h4 class="sub"><i class="ph-bold ph-trend-up"></i>Equity curve</h4>
-    <svg id="equityCurveSvg" width="100%" height="140" viewBox="0 0 600 140" preserveAspectRatio="none" style="background:var(--bone); border-radius:var(--r-md); border:var(--bw-thin) solid var(--border-soft);"></svg>
-    <div id="equityCurveEmpty" class="empty-state" style="display:none;"><i class="ph-bold ph-chart-line"></i><span>No trade history yet — this fills in once trades close.</span></div>
-    <h4 class="sub"><i class="ph-bold ph-stack"></i>Per-strategy breakdown</h4>
-    <table><thead><tr><th>Strategy</th><th>Win rate</th><th>Profit factor</th><th>Streak</th></tr></thead>
-      <tbody id="perStrategyBody"></tbody></table>
-  </section>
+    <!-- Dashboard: sidebar (strategy settings) + main-panel (open positions) -->
+    <div class="panel-grid" id="dashboardPanel">
+      <div class="sidebar">
+        <div class="card" id="profileCard">
+          <div class="card-head"><i class="ph-bold ph-sliders-horizontal"></i><span class="card-head-title">Trading profile</span><span class="card-head-note">risk posture</span></div>
+          <div class="card-body">
+            <p class="hint">A profile is a bundle of risk limits: how much one trade may cost, how many run at once, and when the bot stops for the day. <strong>These are risk settings only</strong> &mdash; no strategy here has a demonstrated edge, so no preset picks one for you or is expected to make money.</p>
+            <div class="profile-active" id="profileActive" data-tip="The profile currently in force, and the risk it actually trades at on this account.">No profile applied yet &mdash; the bot is using its built-in defaults.</div>
+            <div class="field">
+              <label for="profileSelect" data-tip="Pick a risk posture. Nothing changes until you press Apply.">Preset</label>
+              <select id="profileSelect" style="width:100%;" data-tip="Pick a risk posture. The preview below shows exactly what applying it would change."></select>
+            </div>
+            <div id="profilePreview"></div>
+            <div class="row-actions">
+              <button class="mmm-btn sm mmm-btn--mode" id="applyProfileBtn" data-tip="Apply this profile. Its limits become hard bounds: nothing may exceed them afterwards without switching profile."><i class="ph-bold ph-check"></i>Apply profile</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="autoCard">
+          <div class="card-head"><i class="ph-bold ph-robot"></i><span class="card-head-title">Auto mode</span><span class="auto-pill is-off" id="autoHeadNote">OFF</span></div>
+          <div class="card-body">
+            <p class="hint auto-caveat" id="autoCaveat" data-tip="What Auto actually does, stated plainly. Read this before turning it on.">Loading&hellip;</p>
+            <div class="profile-active auto-state" id="autoState" data-tip="What Auto decided on the last engine check, and the reason it gives for it.">Auto mode is off &mdash; the strategy and position size are exactly your own settings.</div>
+            <div id="autoEvidence"></div>
+            <div class="row-actions">
+              <div class="seg auto-seg" role="group" aria-label="Auto mode">
+                <button class="seg-btn" id="autoOffBtn" data-auto="off" data-tip="Auto off: the strategy and position size stay exactly as you set them."><i class="ph-bold ph-hand"></i>Off</button>
+                <button class="seg-btn" id="autoOnBtn" data-auto="on" data-tip="Auto on: the bot picks the strategy from this account's results and shrinks size after losing streaks, always inside the active profile's limits."><i class="ph-bold ph-robot"></i>On</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="manualOrderCard">
+          <div class="card-head"><i class="ph-bold ph-shield-check"></i><span class="card-head-title">Bot stop &amp; target</span><span class="card-head-note">applies to every trade the bot opens</span></div>
+          <div class="card-body">
+            <label class="botstop-use" data-tip="Leave ticked to let each strategy place its own stop and target. Trend and Scalping use volatility; SMC and Pivot breakout use price structure, which a fixed distance cannot express.">
+              <input type="checkbox" id="botStopAuto" checked data-tip="Ticked: each strategy decides its own stop and target. Unticked: the sliders below override them for every strategy.">
+              <span>Let each strategy choose its own levels</span>
+            </label>
+            <div id="botStopSliders" class="botstop-sliders">
+              <div class="stop-slider">
+                <div class="stop-slider-head">
+                  <label for="botSlAtr" data-tip="How far the bot's stop loss sits from entry, in ATR \u2014 the symbol's average candle range. Slide fully left for no stop loss at all.">Stop loss</label>
+                  <span class="stop-slider-value" id="botSlLabel">Off</span>
+                </div>
+                <input type="range" id="botSlAtr" min="0" max="5" step="0.5" value="2"
+                       data-tip="0 = no stop loss. Otherwise the distance is this many times ATR, so it tracks how much the symbol is currently moving.">
+              </div>
+              <div class="stop-slider">
+                <div class="stop-slider-head">
+                  <label for="botTpAtr" data-tip="How far the bot's take profit sits from entry, in ATR. Slide fully left for no take profit \u2014 trades then run until the stop is hit.">Take profit</label>
+                  <span class="stop-slider-value" id="botTpLabel">Off</span>
+                </div>
+                <input type="range" id="botTpAtr" min="0" max="8" step="0.5" value="3"
+                       data-tip="0 = no take profit. Otherwise the distance is this many times ATR.">
+              </div>
+              <p class="stop-slider-note" id="botRrNote"></p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+      <div class="main-panel">
+        <div class="card" id="whyDashCard">
+          <div class="card-head">
+            <i class="ph-bold ph-question"></i><span class="card-head-title">Why is it not opening a trade?</span>
+            <button class="mmm-btn sm mmm-btn--ghost" id="whyOpenFullBtn" style="margin-left:auto;" data-tip="Open the full diagnostic, with every number behind each decision."><i class="ph-bold ph-arrow-square-out"></i>Full detail</button>
+          </div>
+          <div class="card-body" id="whyDashBody">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
+        </div>
+        <div class="trade-table-wrap">
+          <div class="trade-table-head"><span class="card-head-title"><i class="ph-bold ph-list-bullets"></i>Open positions</span></div>
+          <div class="trade-table-body">
+            <div class="table-scroll">
+            <table>
+              <thead><tr>
+                <th data-tip="The unique ID MT5 gives each trade.">Ticket</th>
+                <th data-tip="The market this trade is in.">Symbol</th>
+                <th data-tip="Buy means you profit if price rises; sell means you profit if it falls.">Type</th>
+                <th data-tip="Trade size. 0.01 lots is the usual minimum.">Lots</th>
+                <th data-tip="The price the trade was opened at.">Entry</th>
+                <th data-tip="Take-profit: the price this trade closes at automatically in profit. Blank means none is set.">TP</th>
+                <th data-tip="Stop-loss: the price this trade closes at automatically to cap the loss. Blank means the trade is unprotected.">SL</th>
+                <th data-tip="Money you'd gain or lose if this trade closed right now.">Profit</th>
+                <th data-tip="Your own private note about why you took this trade.">Note</th>
+                <th data-tip="Close this single trade at the current market price.">Close</th>
+              </tr></thead>
+              <tbody id="positionsBody"></tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <section class="mmm-card panel span2" id="alertsPanel" style="display:none;">
-    <h3><i class="ph-bold ph-bell"></i>Price &amp; margin alerts</h3>
-    <div class="row-actions">
-      <input id="alertSymbol" placeholder="EURUSD" style="width:100px;">
-      <select id="alertCondition"><option value="above">above</option><option value="below">below</option></select>
-      <input id="alertPrice" placeholder="price" style="width:100px;">
-      <button class="mmm-btn sm" id="addAlertBtn" title="Fires once when price crosses this level, then removes itself"><i class="ph-bold ph-plus"></i>Add alert</button>
-    </div>
-    <table><thead><tr><th>Symbol</th><th>Condition</th><th>Price</th><th></th></tr></thead>
-      <tbody id="alertsBody"></tbody></table>
-    <h4 class="sub"><i class="ph-bold ph-calendar-x"></i>Blackout windows (news/session)</h4>
-    <div class="row-actions">
-      <input id="boStart" placeholder="2026-09-05T12:25:00+00:00" style="width:220px;">
-      <input id="boEnd" placeholder="2026-09-05T12:35:00+00:00" style="width:220px;">
-      <input id="boLabel" placeholder="NFP" style="width:80px;">
-      <button class="mmm-btn sm" id="addBlackoutBtn" title="Blocks new entries during this UTC time window (existing positions untouched)"><i class="ph-bold ph-plus"></i>Add</button>
-    </div>
-    <table><thead><tr><th>Start</th><th>End</th><th>Label</th><th></th></tr></thead>
-      <tbody id="blackoutsBody"></tbody></table>
-  </section>
+    <!-- Settings: the everyday dials. Anything whose wrong value silently stops trading lives under Advanced. -->
+    <div id="settingsPanel" style="display:none;">
+      <div class="card-columns">
+        <div class="card">
+          <div class="card-head"><i class="ph-bold ph-scales"></i><span class="card-head-title">Risk &amp; limits</span><span class="card-head-note">what one trade may cost</span></div>
+          <div class="card-body">
+            <p class="hint">A trading profile on the Dashboard sets all of these at once. Change them here to fine-tune — a profile's limits are hard bounds, so a value beyond them is refused rather than silently clamped.</p>
+            <div class="settings-grid">
+              <div class="field"><label data-tip="Percentage of your account risked on a single trade. 1 is a common ceiling; above 2 is aggressive.">Risk per trade %</label><input id="setRiskPercent" data-tip="Percent of the account risked on one trade. 1 is a common ceiling."></div>
+              <div class="field"><label data-tip="Hard ceiling on position size in lots, on top of the broker's own limit. 0 means only the broker's limit applies.">Max lot (0 = broker's own)</label><input id="setMaxLot" data-tip="Hard lot ceiling. 0 = only the broker's own volume_max applies."></div>
+              <div class="field"><label data-tip="Hard cap on how many positions can be open at the same time, across every symbol.">Max trades at once</label><input id="setMaxConcurrent" data-tip="Cap on simultaneously open positions, account-wide."></div>
+              <div class="field"><label data-tip="Stop opening new trades once you are down this much on the day. A circuit breaker for bad days.">Daily loss limit %</label><input id="setDailyLoss" data-tip="Stop opening new trades once the day is down this much."></div>
+              <div class="field"><label data-tip="Close everything and stop trading if equity falls this far below its highest-ever value.">Max drawdown %</label><input id="setMaxDrawdown" data-tip="Flatten and block new trades at this drawdown from the equity peak."></div>
+              <div class="field"><label data-tip="How much worse than requested a fill may be before the broker rejects it. Typical: 10-30.">Slippage allowance (points)</label><input id="setSlippage" data-tip="Allowed fill deviation in points. Typical: 10-30."></div>
+              <div class="field"><label data-tip="Minimum planned reward-to-risk of a setup. Below this the signal is refused before it is sized.">Minimum reward vs risk</label><input id="setMinRR" data-tip="Reward:risk floor. A setup below it is refused."></div>
+              <div class="field"><label data-tip="Refuse signals whose stop-loss is wider than this multiple of the market's normal movement (ATR).">Max stop (x volatility)</label><input id="setMaxSlAtr" data-tip="Refuse signals with a stop wider than this multiple of ATR(14)."></div>
+              <div class="field"><label data-tip="Refuse a trade when the broker's lot cap — not your risk setting — is what decides the position size. Leave on.">Refuse lot-capped trades</label>
+                <select id="setBlockLotCapped" data-tip="Refuse trades sized by the broker's lot cap rather than by your risk setting."><option value="true">true</option><option value="false">false</option></select></div>
+              <div class="field"><label data-tip="Stop opening new trades once the total money at risk across all open positions passes the cap below.">Portfolio risk cap on/off</label>
+                <select id="portRiskEnabled" data-tip="Stop opening new trades once total money at risk across all positions passes the cap."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="The cap, as a percentage of equity. Conservative: 5-10.">Max portfolio risk %</label><input id="portRiskMax" value="6" data-tip="Cap as a % of equity. Conservative: 5-10."></div>
+              <div class="field"><label data-tip="How often the dashboard re-reads the account, in seconds. 0.5 = twice a second.">Screen refresh (seconds)</label><input id="setRefreshSeconds" type="number" min="0.2" max="60" step="0.1" value="0.5" data-tip="How often this page polls the bot, in seconds. 0.5 is twice a second. Each poll costs about 11ms, so even 0.2 is comfortable. Does not change how often the bot trades — that is fixed at every 5 seconds."></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><i class="ph-bold ph-sliders"></i><span class="card-head-title">Automatic position management</span><span class="card-head-note">what closes your trades</span></div>
+          <div class="card-body">
+            <p class="hint">Applies to <strong>every</strong> open position on the account — not just trades this bot opened. These rules run on every engine check and are what closes a position that would otherwise run unbounded.</p>
+            <div class="settings-grid">
+              <div class="field"><label data-tip="Turn on the trailing stop: as a trade moves into profit the stop-loss follows it, locking in gains. Start with: false until you trust it.">Trailing stop on/off</label>
+                <select id="trailingEnabled" data-tip="Turn on the trailing stop: as a trade moves into profit the stop-loss follows it, locking in gains."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="How far behind the price the trailing stop sits, in points. Typical: 100–300 on forex. Too tight and normal wiggles close you out.">Trail distance (points)</label><input id="trailingDistance" value="100" data-tip="How far behind the price the trailing stop sits, in points. Typical: 100–300."></div>
+              <div class="field"><label data-tip="Turn on auto move-to-break-even: once a trade is far enough in profit, the stop-loss is moved to your entry price so the trade can no longer lose.">Break-even on/off</label>
+                <select id="beEnabled" data-tip="Once a trade is far enough in profit, move the stop-loss to your entry price so the trade can no longer lose."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="How much profit (in points) a trade needs before the stop is moved to break-even. Typical: 100–200.">Break-even trigger (points)</label><input id="beTrigger" value="100" data-tip="Profit in points required before the stop moves to break-even. Typical: 100–200."></div>
+              <div class="field"><label data-tip="Extra points past your entry to place the break-even stop, so spread/commission is covered. Typical: 5–20.">Break-even offset (points)</label><input id="beOffset" value="10" data-tip="Extra points past entry so spread and commission are covered. Typical: 5–20."></div>
+              <div class="field"><label data-tip="Close part of the position early to bank some profit, and move the stop to break-even on the rest.">Partial take-profit on/off</label>
+                <select id="partialTpEnabled" data-tip="Close part of the position early to bank profit, and move the stop to break-even on the rest."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="Profit in points needed before part of the trade is closed. Typical: 100–300.">Partial TP trigger (points)</label><input id="partialTpTrigger" value="100" data-tip="Profit in points before part of the trade is closed. Typical: 100–300."></div>
+              <div class="field"><label data-tip="How much of the trade to close, as a fraction. 0.5 means close half. Range 0.1–0.9.">Partial TP: fraction to close</label><input id="partialTpFraction" value="0.5" data-tip="Fraction of the trade to close. 0.5 = half. Range 0.1–0.9."></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><i class="ph-bold ph-shield-warning"></i><span class="card-head-title">Swap &amp; schedule</span><span class="card-head-note">when not to trade</span></div>
+          <div class="card-body">
+            <div class="settings-grid">
+              <div class="field"><label data-tip="Block new entries just before the daily rollover, when brokers charge overnight swap fees and spreads widen.">Swap-time block on/off</label>
+                <select id="swapFilterEnabled" data-tip="Block new entries just before daily rollover, when swap fees hit and spreads widen."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="How many hours before rollover to stop entering. Typical: 1.">Block hours before rollover</label><input id="swapBlockHours" value="1" data-tip="Hours before rollover to stop entering. Typical: 1."></div>
+              <div class="field"><label data-tip="The hour (in UTC, 0–23) your broker rolls positions over. Most brokers: 21 or 22 UTC.">Rollover hour (UTC 0-23)</label><input id="swapRolloverHour" value="21" data-tip="Hour in UTC your broker rolls positions over. Most brokers: 21 or 22."></div>
+              <div class="field"><label data-tip="Close everything and stop entering at a chosen weekday and hour — normally used to be flat before the weekend gap.">Weekly shutdown on/off</label>
+                <select id="scheduleFilterEnabled" data-tip="Close everything and stop entering at a chosen weekday and hour — e.g. before the weekend."><option value="false">false</option><option value="true">true</option></select></div>
+              <div class="field"><label data-tip="Which day to shut down on. 0 = Monday, 4 = Friday, 6 = Sunday.">Shutdown weekday (0=Mon)</label><input id="scheduleWeekday" value="4" data-tip="0 = Monday … 4 = Friday … 6 = Sunday."></div>
+              <div class="field"><label data-tip="Hour of that day, in UTC (0–23), when the shutdown kicks in. Typical: 21 on Friday.">Shutdown hour (UTC 0-23)</label><input id="scheduleHour" value="21" data-tip="Hour in UTC when the shutdown kicks in. Typical: 21 on Friday."></div>
+              <div class="field" style="grid-column:1/-1;"><label data-tip="A web address the bot pings if it loses contact with MT5. Paste a Telegram bot URL, a Slack or Discord webhook, or leave blank for none.">Watchdog alert URL (optional)</label>
+                <input id="watchdogWebhook" placeholder="https://..." style="width:100%;" data-tip="Pinged if the bot loses contact with MT5. Telegram / Slack / Discord webhook, or blank."></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /card-columns -->
+    </div><!-- /settingsPanel -->
 
-  <section class="mmm-card panel span2" id="watchlistPanel" style="display:none;">
-    <h3><i class="ph-bold ph-eye"></i>Watchlist <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— multi-symbol</span></h3>
-    <div class="row-actions">
-      <button class="chip status-off" id="wlModeBtn" title="Switches the engine to trade every enabled row below instead of the single symbol in the header"><i class="ph-bold ph-power"></i>Watchlist mode: off</button>
-    </div>
-    <div class="row-actions">
-      <input id="wlSymbol" placeholder="GBPUSD" style="width:90px;">
-      <select id="wlTf"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
-      <select id="wlStrategy">
-        <option value="trend">Trend</option><option value="scalping">Scalping</option>
-        <option value="smc">SMC</option><option value="pivot_breakout">Pivot breakout</option>
-      </select>
-      <select id="wlMode"><option value="auto">auto</option><option value="alert_only">alert_only</option></select>
-      <button class="mmm-btn sm" id="addWlBtn" title="Add this symbol+strategy pair to the watchlist"><i class="ph-bold ph-plus"></i>Add</button>
-    </div>
-    <table><thead><tr><th>Symbol</th><th>TF</th><th>Strategy</th><th>Mode</th><th>Enabled</th><th></th></tr></thead>
-      <tbody id="watchlistBody"></tbody></table>
-    <h4 class="sub"><i class="ph-bold ph-megaphone"></i>Manual signals (alert_only)</h4>
-    <table><thead><tr><th>Symbol</th><th>Strategy</th><th>Signal</th></tr></thead>
-      <tbody id="manualSignalsBody"></tbody></table>
-  </section>
+    <!-- Advanced: signal filters + per-strategy parameters -->
 
-  <section class="mmm-card panel span2" id="backtestPanel" style="display:none;">
-    <h3><i class="ph-bold ph-clock-counter-clockwise"></i>Backtest</h3>
-    <div class="row-actions">
-      <input id="btSymbol" placeholder="EURUSD" style="width:90px;">
-      <select id="btTf"><option>M1</option><option>M5</option><option>M15</option><option>H1</option></select>
-      <select id="btStrategy">
-        <option value="trend">Trend</option><option value="scalping">Scalping</option>
-        <option value="smc">SMC</option><option value="pivot_breakout">Pivot breakout</option>
-      </select>
-      <input id="btBars" placeholder="bars (e.g. 500)" value="500" style="width:110px;">
-      <input id="btEquity" placeholder="initial equity" value="10000" style="width:110px;">
-      <button class="mmm-btn sm" id="runBacktestBtn" title="Simulate this strategy bar-by-bar over the chosen history, no real orders placed"><i class="ph-bold ph-play"></i>Run</button>
+    <div id="advancedPanel" style="display:none;">
+     <div class="card" style="margin-bottom:var(--s-4);">
+      <div class="card-head"><i class="ph-bold ph-funnel"></i><span class="card-head-title">Signal filters</span><span class="card-head-note">all opt-in, off by default</span></div>
+      <div class="card-body">
+        <p class="hint">Extra checks a signal must pass before the bot is allowed to trade it. Each one makes the bot pickier: fewer trades, hopefully better ones. Turn them on one at a time so you can tell what changed.</p>
+        <div class="settings-grid">
+          <div class="field"><label data-tip="Only let the bot trade between the start and end hours below. Useful for sticking to the London or New York session.">Trading-hours filter on/off</label>
+            <select id="sfSessionEnabled" data-tip="Only trade between the start and end hours set below."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="First hour of the day the bot may trade, in UTC (0-23). London opens around 7-8 UTC.">Start hour (UTC 0-23)</label><input id="sfSessionStart" value="0" data-tip="First hour the bot may trade, UTC. London opens around 7-8."></div>
+          <div class="field"><label data-tip="Last hour of the day the bot may trade, in UTC (0-23). New York closes around 21 UTC.">End hour (UTC 0-23)</label><input id="sfSessionEnd" value="23" data-tip="Last hour the bot may trade, UTC. New York closes around 21."></div>
+          <div class="field"><label data-tip="Stop the bot piling into markets that move together, like EURUSD and GBPUSD — otherwise one bad move hits several trades at once.">Correlation limit on/off</label>
+            <select id="sfCorrEnabled" data-tip="Stop the bot piling into markets that move together, like EURUSD and GBPUSD."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="How many trades in closely-related markets are allowed at once. Typical: 1-2.">Max correlated trades</label><input id="sfCorrMax" value="2" data-tip="Trades allowed at once in closely-related markets. Typical: 1-2."></div>
+          <div class="field"><label data-tip="Refuse trades that go against the bigger-picture trend. If the hourly chart is heading up, don't take sell signals.">Bigger-trend filter on/off</label>
+            <select id="sfHtfEnabled" data-tip="Refuse trades that fight the bigger-picture trend."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Which higher timeframe defines that bigger trend. H1 is the usual choice.">Bigger-trend timeframe</label>
+            <select id="sfHtfTf" data-tip="Higher timeframe that defines the bigger trend. H1 is usual."><option>H1</option><option>M15</option></select></div>
+          <div class="field"><label data-tip="Skip trading when the market is unusually wild compared with its recent behaviour — moves are erratic and stops get hit more often.">Wild-market filter on/off</label>
+            <select id="sfVolEnabled" data-tip="Skip trading when the market is unusually wild versus its recent behaviour."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Trade a bit bigger when the setup offers more reward for the risk taken, and smaller when it offers less.">Size by setup quality on/off</label>
+            <select id="sfConfEnabled" data-tip="Trade bigger on setups with a better reward-to-risk ratio, smaller on worse ones."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Cut trade size after losses in a row and restore it after wins. The safe opposite of doubling down.">Shrink size after losses on/off</label>
+            <select id="sfStreakEnabled" data-tip="Cut trade size after consecutive losses; restore it after wins."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Refuse to enter when the broker's spread (the gap between buy and sell price) is wider than usual, because that gap comes straight out of your profit.">Wide-spread filter on/off</label>
+            <select id="sfSpreadEnabled" data-tip="Refuse to enter when the broker's spread is wider than normal."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Only enter if the very latest price ticks are already moving the same way as the signal.">Tick-momentum filter on/off</label>
+            <select id="sfMomentumEnabled" data-tip="Only enter if the latest price ticks already move the same way as the signal."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Use a small model trained on your own past trades to score each signal, and skip the ones it rates poorly. Train it with the button below first.">Learned-score filter on/off</label>
+            <select id="sfMlEnabled" data-tip="Score each signal with a model trained on your own past trades; skip low scores."><option value="false">false</option><option value="true">true</option></select></div>
+          <div class="field"><label data-tip="Minimum score, from 0 to 1, a signal must reach. 0.5 is neutral; 0.6 is stricter and trades less.">Minimum score (0-1)</label><input id="sfMlMinProb" value="0.5" data-tip="Minimum score 0-1 a signal must reach. 0.5 neutral, 0.6 stricter."></div>
+          <div class="field"><label data-tip="Only used by the Ensemble strategy: how many of the individual strategies must agree before a trade is taken. Typical: 2-3.">Ensemble: votes needed</label><input id="sfEnsembleMinAgree" value="2" data-tip="How many strategies must agree before Ensemble trades. Typical: 2-3."></div>
+          <div class="field"><label data-tip="Let the bot watch which strategies are performing badly in live trading and switch away from them automatically.">Auto-tune strategies on/off</label>
+            <select id="sfAutoTuneEnabled" data-tip="Let the bot switch away from strategies that are performing badly live."><option value="false">false</option><option value="true">true</option></select></div>
+        </div>
+        <div class="row-actions">
+          <button class="mmm-btn sm" id="saveSignalFiltersBtn" data-tip="Save every filter setting on this page."><i class="ph-bold ph-floppy-disk"></i>Save</button>
+          <button class="mmm-btn sm mmm-btn--mode" id="trainMlBtn" data-tip="Teach the learned-score filter using your own closed trades. Needs at least 10 completed trades before it can learn anything."><i class="ph-bold ph-brain"></i>Train ML filter</button>
+          <button class="mmm-btn sm mmm-btn--ghost" id="runAutoTuneBtn" data-tip="Check now which strategies are underperforming and report the best one. If auto-tune is on above, it also switches to it."><i class="ph-bold ph-magic-wand"></i>Run auto-tune now</button>
+        </div>
+        <div id="autoTuneResult" style="font-size:13px; color:var(--fg-2); margin-top:10px; font-family:var(--font-body);"></div>
+      </div>
+     </div>
+     <div class="card">
+      <div class="card-head"><i class="ph-bold ph-slider-horizontal"></i><span class="card-head-title">Strategy parameters</span><span class="card-head-note">per strategy</span></div>
+      <div class="card-body">
+        <p class="hint">The entry rules of each strategy. Which strategy actually runs is chosen on the Dashboard — this page only sets how each one behaves.</p>
+        <div class="tabs" id="tabs"></div>
+        <div class="settings-grid" id="settingsGrid"></div>
+        <p class="hint">Changes save themselves and apply on the strategy's next check. No restart needed.</p>
+      </div>
+     </div>
     </div>
-    <div class="stat"><span class="label">Win rate</span><span class="value" id="btWinRate">-</span></div>
-    <div class="stat"><span class="label">Profit factor</span><span class="value" id="btProfitFactor">-</span></div>
-    <div class="stat"><span class="label">Trades</span><span class="value" id="btTradeCount">-</span></div>
-    <div class="stat"><span class="label">Current streak</span><span class="value" id="btStreak">-</span></div>
-    <h4 class="sub" title="Sweeps fast/slow MA period combinations for the trend strategy"><i class="ph-bold ph-magic-wand"></i>Parameter sweep (trend: fast/slow period)</h4>
-    <div class="row-actions"><button class="mmm-btn sm" id="runSweepBtn" title="Backtests every fast/slow MA period combination and ranks by profit factor"><i class="ph-bold ph-play"></i>Run sweep</button></div>
-    <table><thead><tr><th>Fast period</th><th>Slow period</th><th>Profit factor</th><th>Win rate</th></tr></thead>
-      <tbody id="sweepBody"></tbody></table>
-  </section>
 
-  <section class="mmm-card panel span2" id="accountsPanel" style="display:none;">
-    <h3><i class="ph-bold ph-identification-card"></i>MT5 account profiles</h3>
-    <p class="hint">One MT5 terminal process can only be logged into one account at a time — this switches the active login, it does not trade multiple accounts simultaneously.</p>
-    <div class="row-actions">
-      <input id="accName" placeholder="Name" style="width:100px;">
-      <input id="accPath" placeholder="terminal64.exe path (optional)" style="width:200px;">
-      <input id="accLogin" placeholder="login" style="width:100px;">
-      <input id="accPassword" type="password" autocomplete="new-password" placeholder="password" style="width:120px;">
-      <input id="accServer" placeholder="server" style="width:120px;">
-      <button class="mmm-btn sm" id="addAccountBtn" title="Save this login profile locally (password stored in plain state, local convenience only)"><i class="ph-bold ph-plus"></i>Add</button>
+    <!-- History: a plain record of what the bot did. Deliberately no win rate, profit factor
+         or drawdown -- the user cut the performance screen. -->
+    <div class="card" id="historyPanel" style="display:none;">
+      <div class="card-head"><i class="ph-bold ph-clock-counter-clockwise"></i><span class="card-head-title">Trade history</span><span class="card-head-note">closed deals, newest first</span>
+        <button class="mmm-btn sm mmm-btn--ghost" id="histRefreshBtn" style="margin-left:auto;" data-tip="Re-read the closed-trade history from MT5."><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
+      </div>
+      <div class="card-body">
+        <div class="row-actions">
+          <div class="seg" id="histPeriodSeg" role="group" aria-label="Period" data-tip="How far back to list. Longer periods take longer for MT5 to answer.">
+            <button class="seg-btn on" data-period="all" data-tip="Everything the terminal still holds history for.">All</button>
+            <button class="seg-btn" data-period="week" data-tip="The last 7 days.">1 week</button>
+            <button class="seg-btn" data-period="month" data-tip="The last 30 days.">1 month</button>
+            <button class="seg-btn" data-period="3months" data-tip="The last 90 days.">3 months</button>
+          </div>
+          <a class="mmm-btn sm mmm-btn--ghost" id="histExportLink" href="/api/history/export" data-tip="Download these rows as a CSV file you can open in Excel."><i class="ph-bold ph-download-simple"></i>Export CSV</a>
+        </div>
+        <div class="table-scroll" style="max-height:520px; overflow-y:auto;">
+        <table>
+          <thead><tr>
+            <th data-tip="When the trade closed, in your local time.">Time</th>
+            <th data-tip="The market this trade was in.">Symbol</th>
+            <th data-tip="Buy profits if price rises; sell profits if price falls.">Type</th>
+            <th data-tip="Trade size in lots.">Volume</th>
+            <th data-tip="The price the trade closed at.">Price</th>
+            <th data-tip="Money made or lost on the trade itself, before costs.">Profit</th>
+            <th data-tip="What the broker charged to open and close it.">Commission</th>
+            <th data-tip="Overnight financing charged or paid while the trade was held.">Swap</th>
+          </tr></thead>
+          <tbody id="historyBody"></tbody>
+          <tfoot id="historyFoot"></tfoot>
+        </table>
+        </div>
+      </div>
     </div>
-    <table><thead><tr><th>Name</th><th>Server</th><th>Login</th><th></th></tr></thead>
-      <tbody id="accountsBody"></tbody></table>
-  </section>
 
-  <section class="mmm-card panel span2" id="logsPanel" style="display:none;">
-    <h3><i class="ph-bold ph-file-text"></i>Logs <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— plain-English record of everything the bot does</span></h3>
-    <p class="hint">Also written to <code>logs/app.log</code> on disk — open it directly if the app itself won't start.</p>
-    <div class="row-actions">
-      <button class="mmm-btn sm" id="refreshLogsBtn" title="Reload the log immediately (also auto-refreshes every 3s while this tab is open)"><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
-      <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:14px;">
-        <input type="checkbox" id="logsAutoRefresh" checked> Auto-refresh
-      </label>
+    <!-- Why no trade: the full live diagnostic -->
+    <div class="card" id="whyPanel" style="display:none;">
+      <div class="card-head">
+        <i class="ph-bold ph-question"></i><span class="card-head-title">Why is it not opening a trade?</span>
+        <span class="card-head-note">live, updated every few seconds</span>
+        <button class="mmm-btn sm mmm-btn--ghost" id="whyRefreshBtn" style="margin-left:auto;" data-tip="Fetch the newest evaluation right now. This panel also refreshes by itself every 4 seconds while it is open."><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
+      </div>
+      <div class="card-body">
+        <p class="hint">Every tick, the bot asks each strategy for a signal and then runs that signal through a series of gates. This page shows, for each thing it is trading, what the most recent check actually did &mdash; and if a signal was refused, which gate refused it, with the numbers.</p>
+        <div id="whyPanelBody"><div class="empty-state"><span class="spinner"></span></div></div>
+      </div>
     </div>
-    <pre id="logsView" style="background:var(--field); border:var(--bw-thin) solid var(--border-soft); border-radius:var(--r-md); padding:12px; max-height:420px; overflow-y:auto; font-family:var(--font-mono); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
-  </section>
 
-  <section class="mmm-card panel span2" id="signalFiltersPanel" style="display:none;">
-    <h3><i class="ph-bold ph-funnel"></i>Signal filters <span style="font-family:var(--font-body); font-weight:400; font-size:13px; color:var(--fg-2);">— all opt-in, off by default</span></h3>
-    <div class="settings-grid">
-      <div class="field" title="Only trade within these UTC hours"><label>Session filter enabled</label>
-        <select id="sfSessionEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Session start hour (UTC)</label><input id="sfSessionStart" value="0"></div>
-      <div class="field"><label>Session end hour (UTC)</label><input id="sfSessionEnd" value="23"></div>
-      <div class="field" title="Cap positions in correlated pairs (e.g. EURUSD/GBPUSD)"><label>Correlation filter enabled</label>
-        <select id="sfCorrEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>Max correlated positions</label><input id="sfCorrMax" value="2"></div>
-      <div class="field" title="Block signals that fight the higher-timeframe trend"><label>HTF bias filter enabled</label>
-        <select id="sfHtfEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>HTF timeframe</label>
-        <select id="sfHtfTf"><option>H1</option><option>M15</option></select></div>
-      <div class="field" title="Skip entries when volatility is in the top third of recent history"><label>Volatility regime filter enabled</label>
-        <select id="sfVolEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field" title="Scale position size by reward:risk ratio"><label>Confidence sizing enabled</label>
-        <select id="sfConfEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field" title="Shrink position size after consecutive losses"><label>Streak (anti-martingale) sizing enabled</label>
-        <select id="sfStreakEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field" title="Rejects entries when the bar-level spread is wide vs recent average"><label>Spread quality filter enabled</label>
-        <select id="sfSpreadEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field" title="Requires last-N-tick direction to agree with the signal"><label>Tick momentum filter enabled</label>
-        <select id="sfMomentumEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field" title="Filters signals below this trained win-probability"><label>ML win-probability filter enabled</label>
-        <select id="sfMlEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-      <div class="field"><label>ML min win probability</label><input id="sfMlMinProb" value="0.5"></div>
-      <div class="field"><label>Ensemble min agree</label><input id="sfEnsembleMinAgree" value="2"></div>
-      <div class="field" title="Auto-disable strategies with poor live profit factor once enough trades exist"><label>Auto-tune enabled</label>
-        <select id="sfAutoTuneEnabled"><option value="false">false</option><option value="true">true</option></select></div>
+    <!-- Logs: single-column card -->
+    <div class="card" id="logsPanel" style="display:none;">
+      <div class="card-head"><i class="ph-bold ph-file-text"></i><span class="card-head-title">Logs</span><span class="card-head-note">plain-English record of everything the bot does</span></div>
+      <div class="card-body">
+        <p class="hint">Also written to <code>logs/app.log</code> on disk — open it directly if the app itself won't start.</p>
+        <div class="row-actions">
+          <button class="mmm-btn sm" id="refreshLogsBtn" data-tip="Fetch the newest log lines right now. The log also reloads by itself every 3 seconds while auto-refresh is ticked."><i class="ph-bold ph-arrows-clockwise"></i>Refresh</button>
+          <button class="mmm-btn sm mmm-btn--ghost" id="copyLogsBtn" data-tip="Copy every line shown here to the clipboard, ready to paste into a message or a bug report."><i class="ph-bold ph-copy"></i>Copy logs</button>
+          <button class="mmm-btn sm mmm-btn--mode" id="runDiagBtn" data-tip="Ask MT5 straight out why no trades are opening. It checks the Algo Trading button, your account's permissions, and the symbol itself, then tells you exactly what to change."><i class="ph-bold ph-first-aid-kit"></i>Run diagnostic</button>
+          <label style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px;" data-tip="Keep the log updating by itself every 3 seconds. Untick it if you want to read something without the view jumping.">
+            <input type="checkbox" id="logsAutoRefresh" checked data-tip="Reload the log automatically every 3 seconds."> Auto-refresh
+          </label>
+        </div>
+        <pre id="logsView" data-tip="The most recent 300 log lines, oldest at the top." style="background:var(--graphite-3); border:var(--bw-thin) solid var(--border); border-radius:var(--r-md); padding:12px; margin:0; max-width:100%; max-height:420px; overflow:auto; overflow-wrap:anywhere; font-family:var(--font-mono); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word;"></pre>
+      </div>
     </div>
-    <div class="row-actions">
-      <button class="mmm-btn sm" id="saveSignalFiltersBtn" title="Save all Signal Filter settings above"><i class="ph-bold ph-floppy-disk"></i>Save</button>
-      <button class="mmm-btn sm mmm-btn--mode" id="trainMlBtn" title="Trains the win-probability filter on your own closed trades (needs 10+ trades tagged with a strategy)"><i class="ph-bold ph-brain"></i>Train ML filter</button>
-      <button class="mmm-btn sm mmm-btn--ghost" id="runAutoTuneBtn" title="Flags underperforming strategies and suggests (or auto-switches to, if enabled above) the best performer"><i class="ph-bold ph-magic-wand"></i>Run auto-tune now</button>
-    </div>
-    <div id="autoTuneResult" style="font-size:13px; color:var(--fg-2); margin-top:10px; font-family:var(--font-body);"></div>
-  </section>
-</main>
+
+  </div><!-- /app-main -->
+</div><!-- /app-layout -->
 
 <div id="alertBanner"><i class="ph-bold ph-warning"></i><span id="alertBannerText"></span></div>
-<div id="apiErrorBanner" style="position:fixed; bottom:var(--s-5); left:var(--s-5); z-index:900; display:none; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-size:13px; background:var(--ink); color:var(--paper); border:var(--bw) solid var(--danger); border-radius:var(--r-md); box-shadow:var(--sh-3); padding:12px 16px; max-width:420px; opacity:0; transform:translateY(12px); transition: opacity var(--dur-std) var(--ease-out), transform var(--dur-std) var(--ease-out);">
-  <i class="ph-bold ph-warning-circle" style="color:var(--danger); font-size:18px;"></i><span id="apiErrorBannerText"></span>
+<div id="apiErrorBanner" style="position:fixed; bottom:var(--s-5); left:var(--s-5); z-index:1500; display:none; align-items:flex-start; gap:10px; font-family:var(--font-body); font-weight:600; font-size:13px; background:var(--graphite-2); color:var(--fg-1); border:1px solid var(--border); border-left:3px solid var(--danger); border-radius:var(--r-md); box-shadow:var(--sh-4); padding:12px 16px; max-width:min(420px, calc(100vw - 2 * var(--s-5))); overflow-wrap:anywhere; opacity:0; transform:translateY(12px); transition: opacity var(--dur-std) var(--ease-out), transform var(--dur-std) var(--ease-out);">
+  <i class="ph-bold ph-warning-circle" style="color:var(--danger); font-size:17px; flex-shrink:0;"></i><span id="apiErrorBannerText"></span>
 </div>
 <div id="modalRoot"></div>
+<div id="tipLayer" role="tooltip" aria-hidden="true"></div>
 
 <script>
 const STRATEGIES = ["trend", "scalping", "smc", "grid", "pivot_breakout"];
 let currentTab = "trend";
+
+/* ---------- Tooltip engine ----------
+   One position:fixed layer driven by event delegation, so tooltips can never be
+   clipped by a scrolling sidebar, a card, or a table's overflow-x scroller —
+   and it works for elements created later by JS (settings fields, table rows). */
+(function () {
+  const layer = document.getElementById("tipLayer");
+  let anchor = null;
+
+  function place(el) {
+    const text = el.getAttribute("data-tip");
+    if (!text) return;
+    layer.textContent = text;
+    layer.style.left = "0px";
+    layer.style.top = "0px";
+    layer.classList.add("show");
+    const r = el.getBoundingClientRect();
+    const t = layer.getBoundingClientRect();
+    const pad = 8;
+    let left = r.left;
+    let top = r.top - t.height - 8;
+    if (left + t.width > window.innerWidth - pad) left = window.innerWidth - t.width - pad;
+    if (left < pad) left = pad;
+    if (top < pad) top = r.bottom + 8;                       // flip below when there's no room above
+    if (top + t.height > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - t.height - pad);
+    layer.style.left = left + "px";
+    layer.style.top = top + "px";
+  }
+
+  function hide() { anchor = null; layer.classList.remove("show"); }
+
+  function onEnter(e) {
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (!el || el === anchor) { if (!el) hide(); return; }
+    anchor = el;
+    place(el);
+  }
+
+  document.addEventListener("mouseover", onEnter, true);
+  document.addEventListener("focusin", onEnter, true);
+  document.addEventListener("mouseout", (e) => { if (anchor && !anchor.contains(e.relatedTarget)) hide(); }, true);
+  document.addEventListener("focusout", hide, true);
+  document.addEventListener("click", hide, true);
+  window.addEventListener("scroll", hide, true);
+  window.addEventListener("resize", hide);
+})();
 
 /* ---------- Global fetch wrapper: surface every failed API call as a toast, ---------- */
 /* and log it in the browser console too, per "log everything" / "show errors on the site". */
@@ -475,14 +1020,6 @@ async function mmmConfirm(title, message, { danger = false } = {}) {
   return result === true;
 }
 
-async function mmmPromptPasscode(title, message) {
-  const result = await mmmModal({
-    icon: "ph-lock-key", title, message,
-    fields: [{ key: "passcode", label: "Passcode", type: "password", autocomplete: "off" }],
-    confirmText: "Continue",
-  });
-  return result ? result.passcode : null;
-}
 
 async function mmmAlert(title, message, { danger = false } = {}) {
   await mmmModal({ icon: danger ? "ph-warning" : "ph-check-circle", title, message, confirmText: "OK", cancelText: "", confirmClass: danger ? "mmm-btn--mean" : "mmm-btn--mode" });
@@ -522,53 +1059,94 @@ function confettiBurst(x, y) {
 }
 
 /* ---------- Status / data refresh ---------- */
+// Broker symbol names differ per broker (XM: EURUSD#, GOLD.i#). Ask the terminal rather than
+// shipping a guess -- a wrong suggestion here is what routed orders to a disabled symbol.
+// Once at load: it was nested inside refreshStatus(), so the whole symbol list was re-read
+// from the terminal on every poll.
+async function loadSymbolSuggestions() {
+  try {
+    const r = await fetch("/api/symbols");
+    if (!r.ok) return;
+    const { symbols } = await r.json();
+    const list = document.getElementById("symbolList");
+    if (!list || !symbols) return;
+    list.innerHTML = symbols.map(s => `<option value="${escHtml(s)}">`).join("");
+  } catch (e) { /* suggestions are a convenience; typing still works without them */ }
+}
+loadSymbolSuggestions();
+
 async function refreshStatus() {
   const res = await fetch("/api/status");
   const data = await res.json();
-  document.getElementById("statEquity").textContent = data.equity.toFixed(2);
-  document.getElementById("statPositions").textContent = data.positions.length;
-
   const symbolSelect = document.getElementById("symbolSelect");
+
   const tfSelect = document.getElementById("tfSelect");
   const strategySelect = document.getElementById("strategySelect");
-  if (data.watchlist_enabled) {
-    document.getElementById("statStrategy").textContent = "— (Watchlist mode is live)";
-    document.getElementById("statSymbolTf").textContent = "See Watchlist tab";
-    [symbolSelect, tfSelect, strategySelect].forEach(el => { el.disabled = true; });
-    symbolSelect.title = tfSelect.title = strategySelect.title =
-      "Ignored while Watchlist mode is live — this controls single-symbol Auto only. Manage trading symbols in the Watchlist tab.";
-  } else {
-    document.getElementById("statStrategy").textContent = data.active_strategy;
-    document.getElementById("statSymbolTf").textContent = `${data.symbol} / ${data.timeframe}`;
-    [symbolSelect, tfSelect, strategySelect].forEach(el => { el.disabled = false; });
-    symbolSelect.title = "Symbol traded by single-symbol Auto (has no effect while Watchlist mode is live)";
-    tfSelect.title = "Timeframe for the selected strategy (has no effect while Watchlist mode is live)";
-    strategySelect.title = "Strategy run by single-symbol Auto (has no effect while Watchlist mode is live)";
-  }
-  const btn = document.getElementById("autoBtn");
-  btn.innerHTML = data.auto_enabled
-    ? `<i class="ph-bold ph-lightning"></i>Auto: live`
-    : `<i class="ph-bold ph-power"></i>Auto: off`;
-  btn.className = "chip " + (data.auto_enabled ? "status-live" : "status-off");
-  btn.title = data.watchlist_enabled
-    ? "Single-symbol auto-trading is disabled while Watchlist mode is live"
-    : "Arms/disarms live auto-trading for the symbol+strategy selected above";
-  btn.disabled = data.watchlist_enabled && !data.auto_enabled;
-  symbolSelect.value = data.symbol;
-  tfSelect.value = data.timeframe;
-  strategySelect.value = data.active_strategy;
+  renderTradingMode(data.trading_mode || "off", data);
+  document.getElementById("mtSymbolNote").textContent = `${data.symbol} · market order`;
+  renderEngineHealth(data);
+  // Never clobber a control the user is actively editing -- this poll runs every couple of
+  // seconds and used to wipe a half-typed symbol before it could be committed.
+  const editing = document.activeElement;
+  if (editing !== symbolSelect) symbolSelect.value = data.symbol;
+  if (editing !== tfSelect) tfSelect.value = data.timeframe;
+  if (editing !== strategySelect) strategySelect.value = data.active_strategy;
 
   const body = document.getElementById("positionsBody");
   body.innerHTML = "";
   if (data.positions.length === 0) {
-    body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ph-bold ph-tray"></i><span>No open positions.</span></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="ph-bold ph-tray"></i><span>No open positions.</span></div></td></tr>`;
   }
   data.positions.forEach(p => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${p.ticket}</td><td>${p.symbol}</td><td>${p.type}</td><td>${p.volume}</td><td class="mono">${p.profit}</td><td><button class="mmm-btn sm mmm-btn--ghost" data-ticket="${p.ticket}"><i class="ph-bold ph-note-pencil"></i></button></td>`;
-    tr.querySelector("button").onclick = () => editNote(p.ticket);
+    tr.innerHTML = `<td>${escHtml(p.ticket)}</td><td>${escHtml(p.symbol)}</td><td>${escHtml(p.type)}</td><td class="mono">${escHtml(p.volume)}</td>` +
+      `<td class="mono">${escHtml(p.price_open ?? "-")}</td><td class="mono">${escHtml(p.tp || "-")}</td><td class="mono">${escHtml(p.sl || "-")}</td>` +
+      `<td class="mono ${Number(p.profit) >= 0 ? "pl-pos" : "pl-neg"}">${escHtml(p.profit)}</td>` +
+      `<td><button class="mmm-btn sm mmm-btn--ghost" data-note="${escHtml(p.ticket)}" data-tip="Write a private note about this trade — why you took it, what you learned."><i class="ph-bold ph-note-pencil"></i></button></td>` +
+      `<td><button class="mmm-btn sm mmm-btn--mean" data-close="${escHtml(p.ticket)}" data-tip="Close this one trade at the current market price."><i class="ph-bold ph-x"></i></button></td>`;
+    const [noteBtn, closeBtn] = tr.querySelectorAll("button");
+    noteBtn.onclick = () => editNote(p.ticket);
+    closeBtn.onclick = withLoading(closeBtn, async () => {
+      const ok = await mmmConfirm("Close this position?", `Closes ticket #${p.ticket} (${p.symbol} ${p.type}) at market.`, { danger: true });
+      if (!ok) return;
+      await fetch(`/api/manual/position/${p.ticket}/close`, { method: "POST",
+        headers: {"Content-Type":"application/json"}, body: JSON.stringify({}) });
+      refreshStatus();
+    });
     body.appendChild(tr);
   });
+}
+
+/* ---------- Account strip (live from mt5.account_info(), on every tab) ---------- */
+const money = (v, currency) => (v === null || v === undefined || isNaN(v))
+  ? "-" : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (currency ? " " + currency : "");
+
+async function refreshAccount() {
+  let a;
+  try { a = await (await fetch("/api/account")).json(); } catch (e) { return; }
+  const set = (id, text) => { document.getElementById(id).textContent = text; };
+  if (!a.connected) {
+    ["statBalance", "statEquity", "statFreeMargin", "statOpenPnl", "statServer"].forEach(id => set(id, "-"));
+    set("acctLogin", "not connected"); set("acctBroker", "MT5 terminal is not connected");
+    set("acctCurrency", "-");
+    const badge = document.getElementById("acctBadge");
+    badge.textContent = "offline"; badge.className = "acct-badge is-off";
+    return;
+  }
+  set("statBalance", money(a.balance, a.currency));
+  set("statEquity", money(a.equity, a.currency));
+  set("statFreeMargin", money(a.margin_free, a.currency));
+  const pnl = document.getElementById("statOpenPnl");
+  pnl.textContent = money(a.open_pnl, a.currency);
+  pnl.className = "acct-val " + (Number(a.open_pnl) > 0 ? "pl-pos" : Number(a.open_pnl) < 0 ? "pl-neg" : "");
+  set("statServer", `${a.server || "-"} · ${a.open_positions} open`);
+  set("acctLogin", "#" + (a.login ?? "-"));
+  set("acctBroker", a.company || a.server || "-");
+  set("acctCurrency", a.currency || "-");
+  const badge = document.getElementById("acctBadge");
+  const real = a.trade_mode === "real";
+  badge.textContent = real ? "REAL" : (a.trade_mode || "unknown").toUpperCase();
+  badge.className = "acct-badge" + (real ? " is-real" : "");
 }
 
 async function editNote(ticket) {
@@ -587,10 +1165,18 @@ async function editNote(ticket) {
 function renderTabs() {
   const tabs = document.getElementById("tabs");
   tabs.innerHTML = "";
+  const STRATEGY_TIPS = {
+    trend: "Trend: follows two moving averages and trades in the direction of the bigger move.",
+    scalping: "Scalping: takes lots of small, quick trades on the fastest candles.",
+    smc: "SMC: 'smart money concepts' — trades from market-structure zones rather than indicators.",
+    grid: "Grid: places a ladder of orders at fixed distances. Powerful but risky if price trends hard against it.",
+    pivot_breakout: "Pivot breakout: trades when price breaks classic daily support/resistance levels.",
+  };
   STRATEGIES.forEach(s => {
     const el = document.createElement("div");
     el.className = "tab" + (s === currentTab ? " active" : "");
-    el.textContent = s;
+    el.textContent = s.replace(/_/g, " ");
+    el.setAttribute("data-tip", (STRATEGY_TIPS[s] || s) + " Click to edit its settings below.");
     el.tabIndex = 0;
     el.onclick = () => { currentTab = s; renderTabs(); renderSettingsForm(); };
     el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") el.click(); };
@@ -598,39 +1184,63 @@ function renderTabs() {
   });
 }
 
-const FIELD_TOOLTIPS = {
-  risk_percent: "% of account equity risked per trade",
-  fast_period: "Fast moving average lookback period",
-  slow_period: "Slow moving average lookback period",
-  max_spread_points: "Skip entries when spread exceeds this many points",
-  sl_atr_multiple: "Stop-loss distance as a multiple of ATR",
-  tp_atr_multiple: "Take-profit distance as a multiple of ATR",
-  rsi_buy_below: "Only buy when RSI is below this value",
-  rsi_sell_above: "Only sell when RSI is above this value",
-  swing_lookback: "Bars on each side to confirm a swing high/low",
-  min_risk_reward: "Minimum reward:risk ratio required to enter",
-  grid_step_points: "Distance in points between grid levels",
-  max_concurrent_trades: "Maximum open positions allowed at once",
-  daily_loss_limit_percent: "Stop opening new trades once daily loss exceeds this %",
-  max_drawdown_percent: "Flatten all positions if drawdown exceeds this %",
+/* Human label + plain-English explanation for every raw strategy-settings key.
+   The API returns machine names like `sl_atr_multiple`; nobody outside a quant
+   desk knows what that means, so never show the raw key as the label. */
+const FIELD_META = {
+  timeframe:                 ["Candle size", "Which candle size this strategy analyses. M15 = one candle every 15 minutes. Smaller means more trades and more noise."],
+  ma_type:                   ["Average type", "How the moving average is calculated. EMA reacts faster to new prices; SMA is smoother. EMA is the usual choice."],
+  fast_period:               ["Fast average length", "Number of candles in the quick-reacting average. Lower reacts sooner but gives more false signals. Typical: 8-12."],
+  slow_period:               ["Slow average length", "Number of candles in the slow-reacting average. Must be bigger than the fast one. Typical: 20-50."],
+  rsi_period:                ["Momentum lookback", "How many candles the momentum gauge (RSI) looks back over. 14 is the standard setting."],
+  rsi_buy_below:             ["Only buy if momentum below", "Blocks buying when the market already looks overbought. Value is 0-100; typical: 60-70."],
+  rsi_sell_above:            ["Only sell if momentum above", "Blocks selling when the market already looks oversold. Value is 0-100; typical: 30-40."],
+  confirmation_bars:         ["Confirmation candles", "How many finished candles must agree before entering. 1 is responsive; 2-3 is slower but safer."],
+  atr_period:                ["Volatility lookback", "How many candles are used to measure how much this market normally moves. 14 is the standard."],
+  sl_atr_multiple:           ["Stop distance (x volatility)", "Stop-loss distance as a multiple of that normal movement. 1.0 is tight, 2.0 gives the trade room to breathe."],
+  tp_atr_multiple:           ["Target distance (x volatility)", "Take-profit distance as a multiple of normal movement. Keep it above the stop multiple so wins beat losses. Typical: 1.5-3."],
+  max_spread_points:         ["Max spread allowed (points)", "Skip the trade if the broker's buy/sell gap is wider than this. That gap is a cost you pay immediately. Typical: 15-30."],
+  min_candle_body_percent:   ["Minimum candle strength %", "Ignore weak, indecisive candles. 30 means the solid body must be at least 30% of the candle's full range."],
+  session_start_hour:        ["Trading start hour (UTC)", "First hour of the day, in UTC (0-23), this strategy may trade. London opens around 7-8 UTC."],
+  session_end_hour:          ["Trading end hour (UTC)", "Last hour of the day, in UTC (0-23), this strategy may trade. New York closes around 21 UTC."],
+  swing_lookback:            ["Swing detection window", "How many candles either side are checked to confirm a genuine high or low. Higher = only major turning points. Typical: 5-15."],
+  htf_timeframe:             ["Bigger-picture timeframe", "The higher timeframe used to judge the overall trend direction. H1 is the usual choice."],
+  ob_fvg_mitigation_percent: ["Pullback depth %", "How far price must pull back into the zone before an entry is taken. 50 means halfway in."],
+  min_risk_reward:           ["Minimum reward vs risk", "Only take trades that aim to make at least this many times what they risk. 1.5 means make 1.5 for every 1 risked."],
+  grid_step_points:          ["Grid spacing (points)", "Distance in points between each rung of the grid. Tighter grids trade more often and tie up more money."],
+  lot_multiplier:            ["Size step per grid level", "How much bigger each new grid trade is than the last. 1.0 keeps them equal — anything above 1.0 grows risk fast."],
+  pivot_type:                ["Pivot formula", "Which classic method is used to calculate the daily support/resistance levels. 'classic' is the standard."],
+  require_retest:            ["Wait for a retest", "true = wait for price to come back and confirm the broken level before entering. Fewer but cleaner trades."],
+  risk_percent:              ["Risk per trade %", "Percentage of your account risked on a single trade. 1 is a common ceiling; above 2 is aggressive."],
+  slippage_points:           ["Slippage allowance (points)", "How much worse than requested a fill may be before it's rejected. Typical: 10-30."],
+  max_concurrent_trades:     ["Max trades at once", "Hard cap on how many positions can be open simultaneously."],
+  daily_loss_limit_percent:  ["Daily loss limit %", "Stop opening new trades once you're down this much on the day. A circuit breaker for bad days."],
+  max_drawdown_percent:      ["Max drawdown %", "Close everything if the account falls this far from its high point."],
 };
+function fieldLabel(key) { return (FIELD_META[key] || [])[0] || key.replace(/_/g, " "); }
+function fieldTip(key)   { return (FIELD_META[key] || [])[1] || `Strategy setting "${key}".`; }
 
 async function renderSettingsForm() {
   const grid = document.getElementById("settingsGrid");
-  grid.innerHTML = `<div class="empty-state"><span class="spinner" style="border-top-color:var(--ink); border-color:rgba(13,10,44,0.2);"></span></div>`;
+  grid.innerHTML = `<div class="empty-state"><span class="spinner"></span></div>`;
   const res = await fetch(`/api/settings?strategy=${currentTab}`);
   const settings = await res.json();
   grid.innerHTML = "";
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   Object.entries(settings).forEach(([key, value]) => {
     const field = document.createElement("div");
     field.className = "field";
-    field.title = FIELD_TOOLTIPS[key] || key;
+    const tip = esc(fieldTip(key));
     const isBool = typeof value === "boolean";
-    field.innerHTML = `<label title="${field.title}">${key}</label>` +
+    field.innerHTML = `<label data-tip="${tip}">${esc(fieldLabel(key))}</label>` +
       (isBool
-        ? `<select data-key="${key}"><option value="true" ${value ? "selected" : ""}>true</option><option value="false" ${!value ? "selected" : ""}>false</option></select>`
-        : `<input data-key="${key}" value="${value}">`);
+        ? `<select data-key="${key}" data-tip="${tip}"><option value="true" ${value ? "selected" : ""}>true</option><option value="false" ${!value ? "selected" : ""}>false</option></select>`
+        : `<input data-key="${key}" value="${esc(value)}" data-tip="${tip}">`);
     grid.appendChild(field);
+  });
+  // No Save button on this page: each field writes itself on change.
+  grid.querySelectorAll("[data-key]").forEach(el => {
+    el.addEventListener("change", saveSettings);
   });
 }
 
@@ -647,7 +1257,8 @@ async function saveSettings() {
   });
   await fetch("/api/settings", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ strategy: currentTab, settings }) });
-  renderSettingsForm();
+  // Deliberately no re-render here -- this runs on every field change, and rebuilding the
+  // grid would rip the control out from under the user mid-edit.
 }
 
 document.getElementById("symbolSelect").onchange = async (e) => {
@@ -671,26 +1282,141 @@ document.getElementById("strategySelect").onchange = async (e) => {
   refreshStatus();
 };
 
-document.getElementById("autoBtn").onclick = async () => {
-  const isLive = document.getElementById("autoBtn").classList.contains("status-live");
-  if (!isLive) {
-    const ok = await mmmConfirm("Enable live auto-trading?", "This places real trades on your MT5 account with no further confirmation per trade.", { danger: true });
-    if (!ok) return;
-    const status = await (await fetch("/api/status")).json();
-    let passcode;
-    if (status.lock_enabled) {
-      passcode = await mmmPromptPasscode("Trading lock", "Enter your trading lock passcode to continue.");
-      if (passcode === null) return;
-    }
-    const resp = await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ enabled: true, passcode }) });
-    if (resp.status === 403) { await mmmAlert("Wrong passcode", "That passcode doesn't match. Auto-trading was not enabled.", { danger: true }); return; }
+/* ---------- Trading mode: ONE control, two states ----------
+   `trading_mode` on the server is the single source of truth. */
+const MODE_LABEL = { off: "Off", single: "Live" };
+
+/* Every mutating route takes the same optional passcode. Asked for once, at the moment of
+   the action, and never stored. */
+
+/* Paints the segmented control and writes the plain-English "this is what is being traded" line. */
+function renderTradingMode(mode, data) {
+  document.querySelectorAll("#tradingModeSeg .seg-btn").forEach(b => {
+    b.classList.toggle("on", b.dataset.mode === mode);
+    b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+  });
+  const bar = document.getElementById("tradingTargetBar");
+  const text = document.getElementById("tradingTargetText");
+  bar.classList.toggle("live", mode !== "off");
+  if (mode === "off") {
+    text.className = "target-idle";
+    text.innerHTML = `<strong>Nothing is being traded.</strong> The bot places no orders until you switch it to Live. Open positions are still managed by the trailing / break-even rules.`;
   } else {
-    await fetch("/api/auto", { method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ enabled: false }) });
+    text.className = "";
+    text.innerHTML = `Trading <span class="target-what">${escHtml(data.symbol)} / ${escHtml(data.timeframe)} · ${escHtml(data.active_strategy)}</span> — the boxes in the header.`;
   }
-  refreshStatus();
+}
+function escHtml(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function symbolSelectEl() { return document.getElementById("symbolSelect"); }
+function tfSelectEl() { return document.getElementById("tfSelect"); }
+function strategySelectEl() { return document.getElementById("strategySelect"); }
+
+const MODE_CONFIRM = {
+  single: ["Switch the bot to Live?",
+           "The bot will place REAL trades on the symbol, candle size and method shown in the header, with no per-trade confirmation."],
 };
+
+async function setTradingMode(mode) {
+  if (mode !== "off") {
+    const [title, message] = MODE_CONFIRM[mode];
+    if (!await mmmConfirm(title, message, { danger: true })) return;
+  }
+  const resp = await fetch("/api/trading_mode", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ mode }) });
+  if (!resp.ok) { refreshStatus(); return; }
+  await refreshStatus();
+  if (mode !== "off") runDiagnostic({ silentWhenClear: true });   // arming is exactly when a blocked broker matters
+}
+
+document.querySelectorAll("#tradingModeSeg .seg-btn").forEach(btn => {
+  btn.onclick = () => setTradingMode(btn.dataset.mode);
+});
+
+/* ---------- Engine health ----------
+   The engine loop swallows every per-tick exception and carries on, so "live" alone is not
+   evidence it is working. Ticks every 5s; anything past 15s with trading armed is stalled. */
+const TICK_STALE_MS = 15000;
+const HEALTH_SNOOZE_MS = 60000;   // dismiss hides it, but it returns if the fault is still there
+let healthSnoozedUntil = 0;
+function renderEngineHealth(data) {
+  const banner = document.getElementById("engineHealthBanner");
+  const armed = (data.trading_mode || "off") !== "off";
+  const tickMs = data.last_tick_at ? Date.parse(data.last_tick_at) : NaN;
+  const stale = armed && (!data.last_tick_at || (Date.now() - tickMs) > TICK_STALE_MS);
+
+  if (!data.last_error && !stale) { banner.style.display = "none"; return; }
+  if (Date.now() < healthSnoozedUntil) { banner.style.display = "none"; return; }
+
+  const when = (iso) => { const t = Date.parse(iso); return isNaN(t) ? "unknown time" : new Date(t).toLocaleTimeString(); };
+  if (data.last_error) {
+    document.getElementById("engineHealthTitle").textContent = "The trading engine is failing";
+    document.getElementById("engineHealthText").textContent =
+      "Every few seconds the bot tries to run your strategy and it is erroring out instead. No new trades are being taken. The error was: " + data.last_error;
+    document.getElementById("engineHealthMeta").textContent =
+      `Last error ${when(data.last_error_at)}${data.last_tick_at ? " · last check " + when(data.last_tick_at) : ""}`;
+  } else {
+    document.getElementById("engineHealthTitle").textContent = "The trading engine has gone quiet";
+    document.getElementById("engineHealthText").textContent =
+      "Trading is switched on, but the bot hasn't completed a check in over 15 seconds (it should do one every 5). It may be stuck or the MT5 connection may be gone — check the Logs page.";
+    document.getElementById("engineHealthMeta").textContent =
+      data.last_tick_at ? `Last successful check ${when(data.last_tick_at)}` : "The engine has never completed a check since trading was switched on.";
+  }
+  banner.style.display = "flex";
+}
+document.getElementById("engineHealthDismiss").onclick = () => {
+  healthSnoozedUntil = Date.now() + HEALTH_SNOOZE_MS;
+  document.getElementById("engineHealthBanner").style.display = "none";
+};
+
+/* ---------- Trading diagnostic ----------
+   /api/diagnose asks MT5 itself what is blocking trading and returns {problem, fix} pairs. */
+const SEV_LABEL = { blocking: "Blocks trading", warning: "Limits trading", info: "For information" };
+
+function renderDiagnostic(result) {
+  const banner = document.getElementById("diagBanner");
+  const findings = (result && result.findings) || [];
+  if (!findings.length) { banner.style.display = "none"; return; }
+  // A finding is only a blocker if it says so. The symbol-rename note is resolved
+  // automatically by the bot and blocks precisely nothing, so it must not be painted, worded
+  // or counted as though it did.
+  const blocking = findings.filter(f => (f.severity || "blocking") === "blocking");
+  const notesOnly = blocking.length === 0;
+  banner.classList.toggle("notes-only", notesOnly);
+  const n = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  document.getElementById("diagTitle").textContent = notesOnly
+    ? `Nothing is blocking trading on ${result.symbol || ""} — ${n(findings.length, "note")}`
+    : `The bot cannot trade ${result.symbol || ""} — ${n(blocking.length, "problem")} found`;
+  document.getElementById("diagIntro").textContent = notesOnly
+    ? "MT5 was asked directly what is blocking trading, and nothing is. These are things worth knowing about, not faults:"
+    : "MT5 was asked directly what is blocking trading. Fix these and no trades will be missed:";
+  document.getElementById("diagFindings").innerHTML = findings.map(f => {
+    const sev = f.severity || "blocking";
+    return `<div class="finding sev-${sev}">` +
+      `<span class="finding-problem"><span class="finding-sev sev-${sev}">${escHtml(SEV_LABEL[sev] || sev)}</span>${escHtml(f.problem)}</span>` +
+      `<span class="finding-fix">${escHtml(f.fix)}</span></div>`;
+  }).join("");
+  const acct = result.account || {};
+  document.getElementById("diagMeta").textContent = acct.trade_mode
+    ? `Account type: ${acct.trade_mode} · free margin: ${Number(acct.margin_free || 0).toFixed(2)}`
+    : "Could not read the account — MT5 may not be connected.";
+  banner.style.display = "flex";
+}
+document.getElementById("diagDismiss").onclick = () => { document.getElementById("diagBanner").style.display = "none"; };
+
+async function runDiagnostic({ silentWhenClear = false } = {}) {
+  const symbol = document.getElementById("symbolSelect").value;
+  let result;
+  try {
+    result = await (await fetch(`/api/diagnose?symbol=${encodeURIComponent(symbol)}`)).json();
+  } catch (err) { return; }                      // the global fetch wrapper already showed the failure
+  renderDiagnostic(result);
+  if (result.ok && !silentWhenClear) {
+    const notes = result.info_count ? ` There ${result.info_count === 1 ? "is 1 note" : "are " + result.info_count + " notes"} below, but nothing that stops a trade.` : "";
+    await mmmAlert("All clear", `MT5 reports nothing blocking trading on ${result.symbol}. The terminal, your account and the symbol all check out.` + notes);
+  }
+}
+document.getElementById("runDiagBtn").onclick = withLoading(document.getElementById("runDiagBtn"), () => runDiagnostic());
+document.getElementById("runDiagHeaderBtn").onclick = withLoading(document.getElementById("runDiagHeaderBtn"), () => runDiagnostic());
 
 document.getElementById("closeAllBtn").onclick = withLoading(document.getElementById("closeAllBtn"), async () => {
   const ok = await mmmConfirm("Close all open positions?", "This immediately closes every open position at market. It can't be undone.", { danger: true });
@@ -699,22 +1425,461 @@ document.getElementById("closeAllBtn").onclick = withLoading(document.getElement
   refreshStatus();
 });
 
-document.getElementById("saveSettingsBtn").onclick = saveSettings;
+// Strategy parameters save on change -- see renderSettingsForm().
 
+/* dashboardPanel is a CSS grid, the rest are plain blocks — so restore each
+   panel's own layout mode instead of forcing display:block on all of them.
+   (Before this, "dashboard" wasn't in the list at all: its grid stayed visible
+   underneath every other section and two nav items showed as active.) */
+const PANEL_DISPLAY = {
+  dashboardPanel: "grid", historyPanel: "block", whyPanel: "block",
+  settingsPanel: "block", advancedPanel: "block", logsPanel: "block",
+};
+const PANEL_NAV = {
+  dashboardPanel: "railDashboard", historyPanel: "navHistory", whyPanel: "navWhyNoTrade",
+  settingsPanel: "navSettings", advancedPanel: "navAdvanced", logsPanel: "navLogs",
+};
 function showPanel(id) {
-  const panels = ["positionMgrPanel", "analyticsPanel", "alertsPanel", "watchlistPanel", "backtestPanel", "signalFiltersPanel", "accountsPanel", "logsPanel"];
-  const navMap = {
-    positionMgrPanel: "navPositionMgr", analyticsPanel: "navAnalytics", alertsPanel: "navAlerts",
-    watchlistPanel: "navWatchlist", backtestPanel: "navBacktest", signalFiltersPanel: "navSignalFilters",
-    accountsPanel: "navAccounts", logsPanel: "navLogs",
-  };
-  panels.forEach(p => {
-    document.getElementById(p).style.display = (p === id) ? "block" : "none";
-    document.getElementById(navMap[p]).classList.toggle("on", p === id);
+  Object.keys(PANEL_DISPLAY).forEach(p => {
+    document.getElementById(p).style.display = (p === id) ? PANEL_DISPLAY[p] : "none";
+    document.getElementById(PANEL_NAV[p]).classList.toggle("on", p === id);
   });
 }
-document.getElementById("navSignalFilters").onclick = () => { showPanel("signalFiltersPanel"); };
-document.getElementById("navAccounts").onclick = () => { showPanel("accountsPanel"); loadAccounts(); };
+
+/* ---------- "Why is it not opening a trade?" ----------
+   /api/why_no_trade returns the engine's own structured record of the most recent
+   evaluation per (symbol, strategy): whether a signal existed at all, and if it was
+   refused, which named gate refused it, with the measured numbers and the fix. Before this
+   the only answer was logs/app.log plus inference. */
+
+const GATE_LABEL = {
+  lot_clamp: "Broker lot cap",
+  lot_clamp_warn: "Broker lot cap (warning only)",
+  min_lot: "Broker minimum lot",
+  reward_risk: "Reward-to-risk floor",
+  stop_sanity: "Stop-loss sanity check",
+  stop_distance: "Broker minimum stop distance",
+  risk_limits: "Risk limits",
+  portfolio_risk: "Portfolio risk cap",
+  free_margin: "Free margin",
+  swap: "Swap / rollover window",
+  session: "Trading-hours filter",
+  correlation: "Correlated-positions filter",
+  htf: "Higher-timeframe filter",
+  volatility: "Volatility-regime filter",
+  spread: "Spread-quality filter",
+  tick_momentum: "Tick-momentum filter",
+  ml_filter: "Machine-learning filter",
+  kill_switch: "Drawdown / schedule kill switch",
+  no_bars: "Waiting for price history",
+  symbol: "Symbol could not be resolved",
+  grid_equity_stop: "Grid equity stop",
+  grid_lot_cap: "Grid total-lots cap",
+  auto_ineligible: "Auto mode: strategy not eligible in this volatility regime",
+};
+
+const OUTCOME_PILL = {
+  blocked: ["p-blocked", "Blocked", "ph-prohibit"],
+  no_signal: ["p-no_signal", "No signal", "ph-moon"],
+  waiting_bar: ["p-waiting_bar", "Waiting for next candle", "ph-hourglass"],
+  order_sent: ["p-order_sent", "Order sent", "ph-check-circle"],
+  alert_only: ["p-alert_only", "Alert only", "ph-bell"],
+  evaluating: ["p-no_signal", "Checking", "ph-hourglass"],
+};
+
+const NUM_LABEL = {
+  requested_lots: "Lots needed", max_lot: "Lots allowed", min_lot: "Broker minimum lot",
+  actual_lots: "Lots that would be sent", configured_risk_percent: "Risk you configured %",
+  actual_risk_percent: "Risk actually taken %", max_expressible_risk_percent: "Most this account can risk %",
+  sl_distance: "Stop distance (price)", reward_risk: "Reward:risk of this setup",
+  min_reward_risk: "Reward:risk floor", sl_atr_multiple: "Stop vs volatility (xATR)",
+  max_sl_atr_multiple: "Stop limit (xATR)", entry: "Entry price", sl: "Stop loss", tp: "Take profit",
+  atr: "Volatility (ATR)", open_positions: "Positions open now",
+  max_concurrent_trades: "Max positions allowed", daily_pnl_percent: "Today's P&L %",
+  daily_loss_limit_percent: "Daily loss limit %", drawdown_percent: "Drawdown %",
+  max_drawdown_percent: "Max drawdown %", current_portfolio_risk_percent: "Portfolio risk now %",
+  max_portfolio_risk_percent: "Portfolio risk cap %", required_margin: "Margin needed",
+  free_margin: "Margin free", budget: "Margin the bot may use", momentum_score: "Momentum measured",
+  threshold: "Momentum needed", probability: "Win probability", floor: "Probability floor",
+  hour_utc: "Hour now (UTC)", session_start_hour: "Session starts (UTC)",
+  session_end_hour: "Session ends (UTC)", htf_bias: "Higher-timeframe trend",
+  htf_timeframe: "Higher timeframe", bars: "Candles analysed", last_close: "Last price",
+  timeframe: "Candle size", lots: "Lots sent", retcode: "Broker reply code",
+  signal: "Signal", regime: "Volatility regime", equity: "Equity",
+  last_bar_time: "Last candle", broker_reason: "Broker's own reason",
+  current_total_lots: "Grid lots open", new_lots: "Lots this entry adds",
+  hard_max_total_lots: "Grid hard cap", requested_symbol: "Symbol requested",
+  max_ratio: "Spread ratio allowed", current_spread: "Spread now",
+  max_correlated_positions: "Correlated positions allowed", rollover_hour_utc: "Rollover hour (UTC)",
+  hours_before: "Blocked hours before", accepted: "Broker accepted",
+};
+
+function numLabel(key) { return NUM_LABEL[key] || key.replace(/_/g, " "); }
+
+function numValue(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "number") {
+    if (Number.isInteger(v)) return String(v);
+    if (Math.abs(v) >= 1000) return v.toFixed(2);
+    if (Math.abs(v) >= 1) return v.toFixed(3);
+    return v.toFixed(5);
+  }
+  return String(v);
+}
+
+/* `emphasise` names the one number that is actually binding, if any. Everything else stays
+   in normal text colour — see the .why-num.is-binding note in the stylesheet. */
+function whyNumbers(details, emphasise) {
+  const hot = new Set(emphasise || []);
+  const entries = Object.entries(details || {}).filter(([k, v]) => v !== null && v !== undefined && k !== "symbol");
+  if (!entries.length) return "";
+  return `<dl class="why-numbers">` + entries.map(([k, v]) => {
+    const cls = hot.has(k) ? " is-binding" : "";
+    return `<div class="why-num${cls}"><dt>${escHtml(numLabel(k))}</dt><dd>${escHtml(numValue(v))}</dd></div>`;
+  }).join("") + `</dl>`;
+}
+
+/* The risk arithmetic is CONDITIONAL unless a gate is actually refusing right now: it says
+   what would happen to a signal, and on a no-signal card there is no signal to refuse. This
+   used to render the same present-tense "every signal on this symbol is refused" underneath
+   a card whose own headline read "Nothing is blocked", which is the one thing a panel whose
+   entire job is explaining the current state must never do. `blockedNow` is derived from the
+   evaluation's outcome, so the badge, the body sentence and this callout cannot disagree. */
+function whyRiskBlock(risk, blockedNow) {
+  if (!risk) return "";
+  const binds = risk.lot_cap_binds;
+  const line = binds
+    ? `<strong>${risk.configured_risk_percent}% requested &rarr; ${risk.effective_risk_percent}% actual</strong> — the ${risk.max_lot}-lot ceiling binds first.`
+    : `<strong>${risk.configured_risk_percent}% per trade</strong>, and this account can size it in full.`;
+  const numbers = whyNumbers({
+    configured_risk_percent: risk.configured_risk_percent,
+    max_expressible_risk_percent: risk.max_expressible_risk_percent,
+    requested_lots: risk.lots_for_configured_risk,
+    max_lot: risk.max_lot,
+    sl_distance: risk.sl_distance,
+    atr: risk.atr,
+  }, binds ? ["max_lot"] : []);
+  let warn = "";
+  if (binds && risk.block_when_lot_capped) {
+    const fix = `lower risk per trade to about <strong>${risk.max_expressible_risk_percent}%</strong>, or apply a trading profile — the profile picker on the Dashboard computes this number for you.`;
+    const consequence = blockedNow
+      ? `Until then signals on this symbol are refused, because the position size would be decided by the broker's lot limit rather than by your risk setting.`
+      : `Nothing is being refused at this moment. But if a signal appears now it would be refused: ${risk.configured_risk_percent}% needs ${risk.lots_for_configured_risk} lots and the broker allows ${risk.max_lot}, so the position size would be decided by the broker's lot limit rather than by your risk setting.`;
+    warn = `<div class="why-remedy"><i class="ph-bold ph-lightbulb"></i><div><strong>What to do:</strong> ${fix} ${consequence}</div></div>`;
+  }
+  return `<h4 class="sub" style="margin-top:14px;"><i class="ph-bold ph-scales"></i>Risk you asked for vs risk this account can express</h4>` +
+    `<p>${line}</p>` + numbers + warn;
+}
+
+function whyTargetHtml(t, compact) {
+  const ev = t.evaluation;
+  const [pillCls, pillText, pillIcon] = ev ? (OUTCOME_PILL[ev.outcome] || ["p-none", ev.outcome, "ph-question"])
+                                           : ["p-none", "Not checked yet", "ph-hourglass"];
+  const renamed = t.traded_symbol && t.traded_symbol !== t.symbol
+    ? ` <span class="why-target-sub">(traded as ${escHtml(t.traded_symbol)})</span>` : "";
+  const head = `<div class="why-target-head">` +
+    `<span class="why-target-name">${escHtml(t.symbol)}${renamed}</span>` +
+    `<span class="why-target-sub">${escHtml(t.timeframe)} · ${escHtml(String(t.strategy).replace(/_/g, " "))}` +
+    (t.row_mode === "alert_only" ? " · alert only" : "") + `</span>` +
+    `<span class="why-pill ${pillCls}"><i class="ph-bold ${pillIcon}"></i>${escHtml(pillText)}</span></div>`;
+
+  // One source of truth for "is something blocked right now?": the evaluation's outcome.
+  // The pill above, the body sentence and the risk callout below all read it.
+  const blockedNow = !!ev && ev.outcome === "blocked";
+
+  if (!ev) {
+    return `<div class="why-target">${head}<div class="why-target-body">` +
+      `<p>This target has not been evaluated yet. It is checked once every 5 seconds while trading is armed; with trading off it is never checked at all.</p>` +
+      ((compact && !(t.risk && t.risk.lot_cap_binds)) ? "" : whyRiskBlock(t.risk, blockedNow)) + `</div></div>`;
+  }
+
+  const gate = ev.outcome === "blocked" && ev.gate
+    ? `<span class="why-gate"><i class="ph-bold ph-prohibit"></i> Gate: ${escHtml(GATE_LABEL[ev.gate] || ev.gate)}</span>` : "";
+  const when = ev.at ? new Date(Date.parse(ev.at)).toLocaleTimeString() : "";
+  const signal = ev.signal ? ` <span class="why-target-sub">Signal: ${escHtml(ev.signal)}</span>` : "";
+  const remedy = ev.remedy
+    ? `<div class="why-remedy"><i class="ph-bold ph-lightbulb"></i><div><strong>What to do:</strong> ${escHtml(ev.remedy)}</div></div>` : "";
+  const body = `<div class="why-target-body">` + gate +
+    `<p>${escHtml(ev.message || "")}</p>` +
+    `<div class="why-meta">Last checked ${escHtml(when)}${signal ? " ·" : ""}${signal}</div>` +
+    (compact ? "" : whyNumbers(ev.details)) + remedy +
+    // When the lot cap is what refused this signal, the block above already IS the risk
+    // arithmetic -- repeating it underneath is noise, not detail.
+    ((ev.gate === "lot_clamp" || ev.gate === "lot_clamp_warn" ||
+      (compact && !(t.risk && t.risk.lot_cap_binds))) ? "" : whyRiskBlock(t.risk, blockedNow)) + `</div>`;
+  return `<div class="why-target">${head}${body}</div>`;
+}
+
+function whyHeadlineClass(data) {
+  if (!data.armed) return "is-idle";
+  if (data.summary.blocked) return "is-blocked";
+  return "is-clear";
+}
+
+function renderWhy(data, el, compact) {
+  const when = (iso) => { const t = Date.parse(iso); return isNaN(t) ? "never" : new Date(t).toLocaleTimeString(); };
+  const s = data.summary;
+  const modeText = data.trading_mode === "single" ? "Trading is live" : "Trading is off";
+  const meta = `${escHtml(modeText)} · last engine check ${escHtml(when(data.last_tick_at))}` +
+    (data.last_error ? ` · <span style="color:var(--danger);">engine error: ${escHtml(data.last_error)}</span>` : "");
+  el.innerHTML =
+    `<div class="why-headline ${whyHeadlineClass(data)}"><i class="ph-bold ph-info"></i><div>${escHtml(data.headline)}</div></div>` +
+    `<div class="why-meta">${meta}</div>` +
+    data.targets.map(t => whyTargetHtml(t, compact)).join("") +
+    (data.targets.length ? "" : `<div class="empty-state"><i class="ph-bold ph-tray"></i><span>Nothing is configured to trade. Pick a symbol in the header.</span></div>`);
+}
+
+let whyInFlight = false;
+async function loadWhyNoTrade() {
+  if (whyInFlight) return;
+  whyInFlight = true;
+  try {
+    const data = await (await fetch("/api/why_no_trade")).json();
+    const panelBody = document.getElementById("whyPanelBody");
+    const dashBody = document.getElementById("whyDashBody");
+    if (document.getElementById("whyPanel").style.display !== "none") renderWhy(data, panelBody, false);
+    if (document.getElementById("dashboardPanel").style.display !== "none") renderWhy(data, dashBody, true);
+    // Auto's own reasoning rides on the same payload -- one fetch, not two polls.
+    renderAuto(data.auto, data.armed);
+  } catch (e) { /* the global fetch wrapper already surfaced it */ }
+  finally { whyInFlight = false; }
+}
+
+document.getElementById("navWhyNoTrade").onclick = () => { showPanel("whyPanel"); loadWhyNoTrade(); };
+document.getElementById("whyOpenFullBtn").onclick = () => { showPanel("whyPanel"); loadWhyNoTrade(); };
+document.getElementById("whyRefreshBtn").onclick = withLoading(document.getElementById("whyRefreshBtn"), loadWhyNoTrade);
+// Only polls while something that shows it is on screen -- each call costs a few MT5 reads.
+setInterval(() => {
+  if (document.hidden) return;
+  if (document.getElementById("whyPanel").style.display !== "none" ||
+      document.getElementById("dashboardPanel").style.display !== "none") loadWhyNoTrade();
+}, 4000);
+loadWhyNoTrade();
+
+/* ---------- Trading profiles ----------
+   Presets are risk-management postures, nothing else. Each one is resolved against the live
+   account before it is shown, because a preset whose risk cannot be expressed under the
+   broker's lot cap would silently block every trade -- which is exactly what a literal
+   "1% per trade" does on this account. */
+let profilesData = null;
+
+function riskLine(p) {
+  return p.lot_cap_binds
+    ? `<span class="risk-binds">${p.requested_risk_percent}% requested &rarr; ${p.effective_risk_percent}% actual</span> (its ${p.max_lot}-lot ceiling binds first)`
+    : `${p.effective_risk_percent}% per trade, expressible in full`;
+}
+
+function renderProfilePreview() {
+  const box = document.getElementById("profilePreview");
+  if (!profilesData) { box.innerHTML = ""; return; }
+  const p = profilesData.presets.find(x => x.id === document.getElementById("profileSelect").value);
+  if (!p) { box.innerHTML = ""; return; }
+  const changes = p.changes.length
+    ? `<ul class="profile-changes">` + p.changes.map(c =>
+        `<li><span class="ch-label">${escHtml(c.label)}</span><span class="ch-value"><span class="ch-from">${escHtml(String(c.from))} &rarr; </span>${escHtml(String(c.to))}</span></li>`).join("") + `</ul>`
+    : `<p class="profile-desc">Nothing would change — these settings are already in force.</p>`;
+  // A preset's consequence belongs on its own card. The blocking confirmation only fires on
+  // the riskiest tiers, and only at the moment of applying -- too late to inform the choice.
+  const warning = p.warning
+    ? `<p class="profile-warning${p.requires_confirmation ? " danger" : ""}"><i class="ph-bold ph-warning"></i><span>${escHtml(p.warning)}</span></p>`
+    : "";
+  box.innerHTML =
+    `<p class="profile-desc">${escHtml(p.description)}</p>` + warning +
+    `<p class="profile-risk" style="margin:10px 0 0;" data-tip="The risk you ask for is not always the risk the broker lets you take. This is both numbers.">Risk per trade: ${riskLine(p)}</p>` +
+    `<h4 class="sub"><i class="ph-bold ph-list-checks"></i>What applying this changes</h4>` + changes;
+}
+
+async function loadProfiles() {
+  try {
+    profilesData = await (await fetch("/api/profiles")).json();
+  } catch (e) { return; }
+  const select = document.getElementById("profileSelect");
+  const keep = select.value;
+  select.innerHTML = profilesData.presets.map(p =>
+    `<option value="${escHtml(p.id)}">${escHtml(p.label)}</option>`).join("");
+  const active = profilesData.active_profile;
+  select.value = keep || (active && active.id) || "balanced";
+  const box = document.getElementById("profileActive");
+  box.innerHTML = active
+    ? `<span class="profile-active-name">Active: ${escHtml(active.label)}</span>` +
+      `<span class="profile-risk">${escHtml(active.risk_summary)}</span>`
+    : `<span class="profile-active-name">No profile applied</span>` +
+      `<span class="profile-risk">Running on the built-in defaults. Pick a preset below to set your risk limits deliberately.</span>`;
+  renderProfilePreview();
+}
+
+document.getElementById("profileSelect").onchange = renderProfilePreview;
+
+document.getElementById("applyProfileBtn").onclick = withLoading(document.getElementById("applyProfileBtn"), async () => {
+  if (!profilesData) return;
+  const p = profilesData.presets.find(x => x.id === document.getElementById("profileSelect").value);
+  if (!p) return;
+  if (p.requires_confirmation) {
+    const ok = await mmmConfirm(`Apply the ${p.label} profile?`, p.confirmation, { danger: true });
+    if (!ok) return;
+  }
+  const resp = await fetch("/api/profiles/apply", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ id: p.id, confirmed: !!p.requires_confirmation }) });
+  const result = await resp.json();
+  if (!result.ok) return;
+  await loadProfiles();
+  await refreshStatus();
+  loadWhyNoTrade();
+  await mmmAlert(`${p.label} applied`,
+    `Risk per trade is now ${result.profile.effective_risk_percent}%` +
+    (result.profile.lot_cap_binds ? ` — you asked for ${result.profile.requested_risk_percent}%, but that cannot be sized under this profile's lot ceiling, so it was reduced to a number the account can actually trade.` : ".") +
+    ` These limits are now hard bounds: settings that would exceed them are refused until you switch profile.`);
+});
+loadProfiles();
+
+/* ---------- Auto mode ----------
+   Three mechanisms in one fixed order: the volatility regime decides which strategies are
+   ELIGIBLE, realised results SELECT one of those, and the recent losing streak SIZES the
+   position. They never argue -- each one's output is the next one's input, and the sizer
+   only ever produces a number.
+
+   The caveat text is fetched rather than written here, so the honest description of what
+   Auto does lives in exactly one place (core/auto_mode.CAVEAT) and cannot drift. */
+let autoMeta = null;
+
+function autoRow(label, value, tip) {
+  // escHtml leaves quotes alone, which is fine in text but would end an attribute early.
+  const attr = (v) => escHtml(v).replace(/"/g, "&quot;");
+  return `<li${tip ? ` data-tip="${attr(tip)}"` : ""}><span class="ch-label">${escHtml(label)}</span>` +
+         `<span class="ch-value">${escHtml(value)}</span></li>`;
+}
+
+/* Auto chooses the strategy and sizes the position, so the controls that claim to do those
+   things must not sit there enabled while Auto ignores them.
+
+   The PROFILE picker deliberately stays enabled. Auto operates strictly inside the active
+   profile's bounds and can only ever lower risk within them, so the profile is the user's
+   one real lever over Auto -- locking it would take away the only control that still works. */
+const STRATEGY_TIP_MANUAL = document.getElementById("strategySelect").dataset.tip;
+const STRATEGY_TIP_AUTO =
+  "Auto mode is choosing the strategy — it re-picks one on every engine check from the " +
+  "volatility regime and this account's own closed trades, so a choice made here would be " +
+  "overwritten within seconds. Turn Auto off on the Auto mode card to choose it yourself.";
+
+function applyAutoLocks(enabled) {
+  const sel = document.getElementById("strategySelect");
+  sel.disabled = enabled;
+  sel.dataset.tip = enabled ? STRATEGY_TIP_AUTO : STRATEGY_TIP_MANUAL;
+  document.getElementById("strategyAutoBadge").hidden = !enabled;
+
+  // Risk per trade is the other thing Auto moves. It is NOT disabled: the value here is the
+  // ceiling Auto works below, so it stays the user's to set -- it just has to say so.
+  document.querySelectorAll('[data-key="risk_percent"]').forEach(el => {
+    el.dataset.tip = enabled
+      ? "Risk per trade %. This is the CEILING while Auto is on: Auto shrinks the position " +
+        "below it after losing trades, and can never size above it."
+      : "Percentage of your account risked on a single trade. 1 is a common ceiling; above 2 is aggressive.";
+  });
+}
+
+function renderAuto(auto, armed) {
+  const state = document.getElementById("autoState");
+  const evidence = document.getElementById("autoEvidence");
+  const enabled = auto ? !!auto.enabled : !!(autoMeta && autoMeta.enabled);
+
+  document.getElementById("autoOffBtn").classList.toggle("on", !enabled);
+  document.getElementById("autoOnBtn").classList.toggle("on", enabled);
+  state.classList.toggle("is-on", enabled);
+  const pill = document.getElementById("autoHeadNote");
+  pill.textContent = enabled ? "ON" : "OFF";
+  pill.classList.toggle("is-on", enabled);
+  pill.classList.toggle("is-off", !enabled);
+  applyAutoLocks(enabled);
+
+  if (!enabled) {
+    state.innerHTML = `<span class="profile-active-name">Auto is off</span>` +
+      `<span class="profile-risk">The strategy and position size are exactly your own settings.</span>`;
+    evidence.innerHTML = "";
+    return;
+  }
+  if (!auto || !auto.enabled) {
+    state.innerHTML = `<span class="profile-active-name">Auto is on, but has not decided yet</span>` +
+      `<span class="profile-risk">${armed ? "Waiting for the next engine check, about 5 seconds." : "Trading is switched off, so the engine is not running and Auto is not being consulted."}</span>`;
+    evidence.innerHTML = "";
+    return;
+  }
+
+  const headline = auto.strategy_changed
+    ? `Trading ${auto.strategy} (switched from ${auto.strategy_from})`
+    : (auto.strategy ? `Trading ${auto.strategy}` : `Strategy unchanged (${auto.strategy_from})`);
+  state.innerHTML = `<span class="profile-active-name">${escHtml(headline)}</span>` +
+    `<span class="profile-risk">${escHtml(auto.reason)}</span>`;
+
+  const sample = Object.keys(auto.sample || {}).length
+    ? Object.keys(auto.sample).sort().map(k => `${k} ${auto.sample[k]}`).join(", ")
+    : "none attributed to an eligible strategy";
+  const excluded = Object.keys(auto.excluded || {}).sort();
+  const thin = !auto.sample_sufficient;
+
+  evidence.innerHTML =
+    `<h4 class="sub"><i class="ph-bold ph-list-magnifying-glass"></i>What it decided that on</h4>` +
+    `<ul class="profile-changes auto-evidence">` +
+      autoRow("Volatility regime", auto.regime || "could not be read",
+              "Step 1 of 3: which strategies are ALLOWED to trade in the current market state. Measured from how far price is moving now against its own recent range.") +
+      autoRow("Ruled out by the regime", excluded.length ? excluded.join(", ") : "none",
+              excluded.length ? excluded.map(k => `${k}: ${auto.excluded[k]}`).join(" · ") : "Nothing is excluded in this regime.") +
+      autoRow("Closed trades used", sample,
+              "Step 2 of 3: among the strategies still eligible, this account's own realised results pick one. These are the trade counts behind that.") +
+      autoRow("Minimum before acting", `${auto.min_trades} trades`,
+              "Below this, Auto changes nothing at all. Fewer trades than this cannot tell these strategies apart.") +
+      autoRow("Losing streak", auto.streak ? `${auto.streak} in a row` : "none",
+              "Step 3 of 3: sizing only. A losing streak shrinks the next position and never picks a strategy.") +
+      autoRow("Risk per trade", auto.risk_percent === auto.profile_risk_percent
+                ? `${auto.profile_risk_percent}% (unchanged)`
+                : `${auto.profile_risk_percent}% → ${auto.risk_percent}%`,
+              "Auto can only ever lower this. The active profile's figure is a hard ceiling.") +
+    `</ul>` +
+    (thin ? `<p class="profile-desc"><strong>The sample is too thin to choose on.</strong> Auto is deliberately doing nothing to the strategy until at least ${auto.min_trades} trades have closed on one of the eligible strategies. Position sizing still responds to losing streaks.</p>` : "");
+}
+
+async function loadAutoMode() {
+  try {
+    autoMeta = await (await fetch("/api/auto_mode")).json();
+  } catch (e) { return; }
+  document.getElementById("autoCaveat").textContent = autoMeta.caveat;
+  renderAuto(autoMeta.decision, false);
+}
+
+async function setAutoMode(turningOn) {
+  if (turningOn) {
+    const ok = await mmmConfirm("Turn Auto mode on?", autoMeta ? autoMeta.caveat : "");
+    if (!ok) return;
+  }
+  const resp = await fetch("/api/auto_mode", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ enabled: turningOn }) });
+  const result = await resp.json();
+  if (!result.ok) return;
+  autoMeta = result;
+  document.getElementById("autoCaveat").textContent = result.caveat;
+  renderAuto(result.decision, false);
+  loadWhyNoTrade();
+  await mmmAlert(turningOn ? "Auto mode is on" : "Auto mode is off",
+    turningOn
+      ? `Its decision and the evidence behind it are shown on the Auto mode card, and written to the log on every change. It stays inside the active profile's limits and can only lower risk, never raise it.`
+      : `The strategy and position size are back to exactly what you set.`);
+}
+
+// Two explicit positions rather than one toggle: clicking the side you are already on is a
+// no-op, so the control can never be left showing a state it is not in.
+["autoOffBtn", "autoOnBtn"].forEach(id => {
+  const el = document.getElementById(id);
+  el.onclick = withLoading(el, async () => {
+    const wantOn = id === "autoOnBtn";
+    if (wantOn === !!(autoMeta && autoMeta.enabled)) return;
+    await setAutoMode(wantOn);
+  });
+});
+loadAutoMode();
+
+document.getElementById("navAdvanced").onclick = () => { showPanel("advancedPanel"); };
+document.getElementById("navSettings").onclick = () => { showPanel("settingsPanel"); loadGlobalSettings(); };
+document.getElementById("navHistory").onclick = () => { showPanel("historyPanel"); loadHistory(); };
 document.getElementById("navLogs").onclick = () => { showPanel("logsPanel"); loadLogs(); };
 
 async function loadLogs() {
@@ -726,52 +1891,35 @@ async function loadLogs() {
   if (wasAtBottom) view.scrollTop = view.scrollHeight;
 }
 document.getElementById("refreshLogsBtn").onclick = loadLogs;
+
+document.getElementById("copyLogsBtn").onclick = withLoading(
+  document.getElementById("copyLogsBtn"), async () => {
+    const text = document.getElementById("logsView").textContent || "";
+    if (!text.trim()) { await mmmAlert("Nothing to copy", "The log is empty."); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // navigator.clipboard needs a secure context; 127.0.0.1 counts, but fall back anyway
+      // so a stricter browser setting cannot leave the button doing nothing.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    const lines = text.trim().split(/\r?\n/).length;
+    await mmmAlert("Copied", `${lines} log line${lines === 1 ? "" : "s"} copied to the clipboard.`);
+  });
 setInterval(() => {
+  if (document.hidden) return;
   if (document.getElementById("logsPanel").style.display !== "none" &&
       document.getElementById("logsAutoRefresh").checked) loadLogs();
 }, 3000);
 
-async function loadAccounts() {
-  const res = await fetch("/api/accounts");
-  const accs = await res.json();
-  const body = document.getElementById("accountsBody");
-  body.innerHTML = "";
-  if (accs.length === 0) {
-    body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="ph-bold ph-identification-card"></i><span>No saved accounts yet.</span></div></td></tr>`;
-  }
-  accs.forEach(a => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${a.name}</td><td>${a.server}</td><td>${a.login}</td>` +
-      `<td style="display:flex; gap:6px;"><button class="mmm-btn sm" data-connect="${a.id}"><i class="ph-bold ph-plug"></i>Connect</button> <button class="mmm-btn sm mmm-btn--mean" data-del="${a.id}"><i class="ph-bold ph-trash"></i></button></td>`;
-    const [connectBtn, delBtn] = tr.querySelectorAll("button");
-    connectBtn.onclick = withLoading(connectBtn, async () => {
-      const resp = await fetch(`/api/accounts/${a.id}/connect`, { method: "POST" });
-      const result = await resp.json();
-      await mmmAlert(result.ok ? "Connected" : "Connection failed", result.ok ? `Now logged into ${a.name}.` : "Check the path/login/server and try again.", { danger: !result.ok });
-    });
-    delBtn.onclick = async () => {
-      const ok = await mmmConfirm("Delete account profile?", `This removes the saved login for "${a.name}", including its stored password.`, { danger: true });
-      if (!ok) return;
-      await fetch(`/api/accounts/${a.id}`, { method: "DELETE" });
-      loadAccounts();
-    };
-    body.appendChild(tr);
-  });
-}
-document.getElementById("addAccountBtn").onclick = async () => {
-  await fetch("/api/accounts", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      name: document.getElementById("accName").value,
-      path: document.getElementById("accPath").value,
-      login: Number(document.getElementById("accLogin").value) || null,
-      password: document.getElementById("accPassword").value,
-      server: document.getElementById("accServer").value,
-    }) });
-  loadAccounts();
-};
-document.getElementById("saveStateBtn").onclick = withLoading(document.getElementById("saveStateBtn"), async () => {
-  await fetch("/api/state/save", { method: "POST" });
-});
+
 document.getElementById("saveSignalFiltersBtn").onclick = async () => {
   await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({
@@ -812,304 +1960,238 @@ document.getElementById("runAutoTuneBtn").onclick = withLoading(document.getElem
     `Suggested disable: ${result.disable_suggested.join(", ") || "none"} · Best strategy: ${result.best_strategy || "n/a"}` +
     (result.switched_to ? ` · Switched active strategy to ${result.switched_to}` : "");
 });
-document.getElementById("navPositionMgr").onclick = () => { showPanel("positionMgrPanel"); };
-document.getElementById("navAnalytics").onclick = () => { showPanel("analyticsPanel"); loadAnalytics(); };
-document.getElementById("navAlerts").onclick = () => { showPanel("alertsPanel"); loadAlerts(); loadBlackouts(); };
-document.getElementById("navWatchlist").onclick = () => { showPanel("watchlistPanel"); loadWatchlist(); };
-document.getElementById("navBacktest").onclick = () => { showPanel("backtestPanel"); };
 
-document.getElementById("runBacktestBtn").onclick = withLoading(document.getElementById("runBacktestBtn"), async () => {
-  const params = new URLSearchParams({
-    symbol: document.getElementById("btSymbol").value,
-    timeframe: document.getElementById("btTf").value,
-    strategy: document.getElementById("btStrategy").value,
-    bars: document.getElementById("btBars").value,
-    initial_equity: document.getElementById("btEquity").value,
-  });
-  const res = await fetch(`/api/backtest?${params}`);
-  const data = await res.json();
-  document.getElementById("btWinRate").textContent = data.stats.win_rate + "%";
-  document.getElementById("btProfitFactor").textContent = data.stats.profit_factor;
-  document.getElementById("btTradeCount").textContent = data.deals.length;
-  document.getElementById("btStreak").textContent = data.stats.current_streak;
-});
 
-async function loadBlackouts() {
-  const res = await fetch("/api/blackouts");
-  const rows = await res.json();
-  const body = document.getElementById("blackoutsBody");
-  body.innerHTML = "";
-  if (rows.length === 0) {
-    body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="ph-bold ph-calendar-check"></i><span>No blackout windows set.</span></div></td></tr>`;
-  }
-  rows.forEach(b => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${b.start}</td><td>${b.end}</td><td>${b.label}</td><td><button class="mmm-btn sm mmm-btn--mean" data-id="${b.id}"><i class="ph-bold ph-trash"></i></button></td>`;
-    tr.querySelector("button").onclick = async () => {
-      const ok = await mmmConfirm("Delete blackout window?", `Removes the "${b.label || "unlabeled"}" window.`, { danger: true });
-      if (!ok) return;
-      await fetch(`/api/blackouts/${b.id}`, { method: "DELETE" });
-      loadBlackouts();
-    };
-    body.appendChild(tr);
-  });
-}
-document.getElementById("addBlackoutBtn").onclick = async () => {
-  await fetch("/api/blackouts", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      start: document.getElementById("boStart").value,
-      end: document.getElementById("boEnd").value,
-      label: document.getElementById("boLabel").value,
-    }) });
-  loadBlackouts();
+
+
+/* Every control on Settings and Advanced is filled from the server before it can be saved.
+   Without this, opening a page and pressing Save wrote the hardcoded HTML defaults over
+   whatever the active profile had set. */
+const SETTING_FIELDS = {
+  setRiskPercent: "risk_percent", setMaxLot: "max_lot", setMaxConcurrent: "max_concurrent_trades",
+  setDailyLoss: "daily_loss_limit_percent", setMaxDrawdown: "max_drawdown_percent",
+  setSlippage: "slippage_points", setMinRR: "min_reward_risk", setMaxSlAtr: "max_sl_atr_multiple",
+  setBlockLotCapped: "block_when_lot_capped",
+  trailingEnabled: "trailing_enabled", trailingDistance: "trailing_distance_points",
+  beEnabled: "breakeven_enabled", beTrigger: "breakeven_trigger_points", beOffset: "breakeven_offset_points",
+  partialTpEnabled: "partial_tp_enabled", partialTpTrigger: "partial_tp_trigger_points",
+  partialTpFraction: "partial_tp_close_fraction",
+  portRiskEnabled: "portfolio_risk_filter_enabled", portRiskMax: "max_portfolio_risk_percent",
+  swapFilterEnabled: "swap_filter_enabled", swapBlockHours: "swap_block_hours_before_rollover",
+  swapRolloverHour: "swap_rollover_hour_utc",
+  scheduleFilterEnabled: "schedule_filter_enabled", scheduleWeekday: "schedule_disable_weekday",
+  scheduleHour: "schedule_disable_hour_utc", watchdogWebhook: "watchdog_webhook_url",
+  sfSessionEnabled: "session_filter_enabled", sfSessionStart: "session_start_hour",
+  sfSessionEnd: "session_end_hour", sfCorrEnabled: "correlation_filter_enabled",
+  sfCorrMax: "correlation_max_positions", sfHtfEnabled: "htf_filter_enabled",
+  sfHtfTf: "htf_timeframe", sfVolEnabled: "volatility_regime_filter_enabled",
+  sfConfEnabled: "confidence_sizing_enabled", sfStreakEnabled: "streak_sizing_enabled",
+  sfSpreadEnabled: "spread_quality_filter_enabled", sfMomentumEnabled: "tick_momentum_filter_enabled",
+  sfMlEnabled: "ml_filter_enabled", sfMlMinProb: "ml_filter_min_probability",
+  sfEnsembleMinAgree: "ensemble_min_agree", sfAutoTuneEnabled: "auto_tune_enabled",
 };
 
-async function loadWatchlist() {
-  const status = await (await fetch("/api/status")).json();
-  const modeBtn = document.getElementById("wlModeBtn");
-  modeBtn.innerHTML = status.watchlist_enabled
-    ? `<i class="ph-bold ph-lightning"></i>Watchlist mode: live`
-    : `<i class="ph-bold ph-power"></i>Watchlist mode: off`;
-  modeBtn.className = "chip " + (status.watchlist_enabled ? "status-live" : "status-off");
-
-  const res = await fetch("/api/watchlist");
-  const entries = await res.json();
-  const body = document.getElementById("watchlistBody");
-  body.innerHTML = "";
-  if (entries.length === 0) {
-    body.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ph-bold ph-eye"></i><span>No symbols added yet.</span></div></td></tr>`;
-  }
-  entries.forEach(w => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${w.symbol}</td><td>${w.timeframe}</td><td>${w.strategy}</td><td>${w.mode}</td>` +
-      `<td><input type="checkbox" ${w.enabled ? "checked" : ""} data-id="${w.id}"></td>` +
-      `<td><button class="mmm-btn sm mmm-btn--mean" data-del="${w.id}"><i class="ph-bold ph-trash"></i></button></td>`;
-    tr.querySelector("input").onchange = async (e) => {
-      await fetch(`/api/watchlist/${w.id}/toggle`, { method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ enabled: e.target.checked }) });
-    };
-    tr.querySelector("button").onclick = async () => {
-      const ok = await mmmConfirm("Remove from watchlist?", `Stops tracking ${w.symbol} (${w.strategy}).`, { danger: true });
-      if (!ok) return;
-      await fetch(`/api/watchlist/${w.id}`, { method: "DELETE" });
-      loadWatchlist();
-    };
-    body.appendChild(tr);
-  });
-
-  const sigBody = document.getElementById("manualSignalsBody");
-  sigBody.innerHTML = "";
-  (status.manual_signals || []).forEach(s => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${s.symbol}</td><td>${s.strategy}</td><td>${s.signal}</td>`;
-    sigBody.appendChild(tr);
+// The Settings page has no Save button: each control writes itself the moment you change
+// it. The server is the authority on bounds -- an active trading profile can refuse a value
+// -- so we re-read afterwards and tell the user rather than leaving a rejected number on
+// screen looking accepted.
+function wireSettingsAutoSave() {
+  Object.entries(SETTING_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("change", async () => {
+      let value = el.type === "checkbox" ? el.checked : el.value;
+      if (value === "true") value = true;
+      else if (value === "false") value = false;
+      else if (typeof value === "string" && value.trim() !== "" && !isNaN(value)) value = Number(value);
+      let result = {};
+      try {
+        const resp = await fetch("/api/global_settings", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ [key]: value }) });
+        result = await resp.json();
+      } catch (e) { return; }
+      // The server returns rejected as {key: reason}, not a list.
+      const refusals = Object.values((result && result.rejected) || {});
+      if (refusals.length) {
+        await mmmAlert("Not saved", refusals.join(" "), { danger: true });
+      }
+      loadGlobalSettings();
+    });
   });
 }
-document.getElementById("addWlBtn").onclick = async () => {
-  await fetch("/api/watchlist", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      symbol: document.getElementById("wlSymbol").value,
-      timeframe: document.getElementById("wlTf").value,
-      strategy: document.getElementById("wlStrategy").value,
-      mode: document.getElementById("wlMode").value,
-    }) });
-  loadWatchlist();
-};
 
-document.getElementById("savePositionMgrBtn").onclick = async () => {
-  await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      trailing_enabled: document.getElementById("trailingEnabled").value === "true",
-      trailing_distance_points: Number(document.getElementById("trailingDistance").value),
-      breakeven_enabled: document.getElementById("beEnabled").value === "true",
-      breakeven_trigger_points: Number(document.getElementById("beTrigger").value),
-      breakeven_offset_points: Number(document.getElementById("beOffset").value),
-      margin_alert_level_percent: Number(document.getElementById("marginAlertLevel").value),
-      partial_tp_enabled: document.getElementById("partialTpEnabled").value === "true",
-      partial_tp_trigger_points: Number(document.getElementById("partialTpTrigger").value),
-      partial_tp_close_fraction: Number(document.getElementById("partialTpFraction").value),
-      portfolio_risk_filter_enabled: document.getElementById("portRiskEnabled").value === "true",
-      max_portfolio_risk_percent: Number(document.getElementById("portRiskMax").value),
-      swap_filter_enabled: document.getElementById("swapFilterEnabled").value === "true",
-      swap_block_hours_before_rollover: Number(document.getElementById("swapBlockHours").value),
-      swap_rollover_hour_utc: Number(document.getElementById("swapRolloverHour").value),
-      schedule_filter_enabled: document.getElementById("scheduleFilterEnabled").value === "true",
-      schedule_disable_weekday: Number(document.getElementById("scheduleWeekday").value),
-      schedule_disable_hour_utc: Number(document.getElementById("scheduleHour").value),
-      watchdog_webhook_url: document.getElementById("watchdogWebhook").value,
-    }) });
-};
-document.getElementById("applyAllBtn").onclick = withLoading(document.getElementById("applyAllBtn"), async () => {
-  const ok = await mmmConfirm("Apply now to all positions?", "Runs trailing-stop / break-even / partial-TP logic immediately against every open position.", { danger: true });
-  if (!ok) return;
-  await fetch("/api/position_manager/apply_all", { method: "POST" });
-});
-document.getElementById("saveLockBtn").onclick = async () => {
-  await fetch("/api/lock", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      enabled: document.getElementById("lockEnabled").checked,
-      passcode: document.getElementById("lockPasscode").value,
-    }) });
-};
-document.getElementById("wlModeBtn").onclick = async () => {
-  const btn = document.getElementById("wlModeBtn");
-  const isLive = btn.classList.contains("status-live");
-  if (!isLive) {
-    const ok = await mmmConfirm("Enable watchlist auto-trading?", "Replaces single-symbol Auto — trades every enabled watchlist entry.", { danger: true });
-    if (!ok) return;
-    const status = await (await fetch("/api/status")).json();
-    let passcode;
-    if (status.lock_enabled) {
-      passcode = await mmmPromptPasscode("Trading lock", "Enter your trading lock passcode to continue.");
-      if (passcode === null) return;
-    }
-    const resp = await fetch("/api/watchlist_mode", { method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ enabled: true, passcode }) });
-    if (resp.status === 403) { await mmmAlert("Wrong passcode", "That passcode doesn't match. Watchlist mode was not enabled.", { danger: true }); return; }
+async function loadGlobalSettings() {
+  let settings;
+  try { settings = await (await fetch("/api/global_settings")).json(); } catch (e) { return; }
+  Object.entries(SETTING_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el || !(key in settings) || el === document.activeElement) return;
+    el.value = typeof settings[key] === "boolean" ? String(settings[key]) : settings[key];
+  });
+  if ("bot_stop_override_enabled" in settings) {
+    document.getElementById("botStopAuto").checked = !settings.bot_stop_override_enabled;
+    document.getElementById("botSlAtr").value = settings.bot_sl_atr_multiple ?? 2;
+    document.getElementById("botTpAtr").value = settings.bot_tp_atr_multiple ?? 3;
+    renderBotStops();
+  }
+}
+
+wireSettingsAutoSave();
+
+
+
+/* ---------- Bot stop & target ----------
+   These override whatever stop and target the strategy proposed, for every strategy. Off
+   means the order really is sent without that side -- the engine's "every trade must have a
+   stop" check is skipped, because a check that silently blocks every trade is how this bot
+   spent hours doing nothing. The consequence is stated instead. */
+function botStops() {
+  if (document.getElementById("botStopAuto").checked) return { auto: true, sl: 0, tp: 0 };
+  return { auto: false,
+           sl: parseFloat(document.getElementById("botSlAtr").value) || 0,
+           tp: parseFloat(document.getElementById("botTpAtr").value) || 0 };
+}
+
+function renderBotStops() {
+  const { auto, sl, tp } = botStops();
+  document.getElementById("botStopSliders").style.opacity = auto ? "0.4" : "1";
+  ["botSlAtr", "botTpAtr"].forEach(id => document.getElementById(id).disabled = auto);
+  const slL = document.getElementById("botSlLabel"), tpL = document.getElementById("botTpLabel");
+  slL.textContent = sl > 0 ? sl.toFixed(1) + "x ATR" : "Off";
+  tpL.textContent = tp > 0 ? tp.toFixed(1) + "x ATR" : "Off";
+  slL.classList.toggle("off", sl === 0);
+  tpL.classList.toggle("off", tp === 0);
+
+  const note = document.getElementById("botRrNote");
+  note.classList.remove("warn");
+  if (auto) {
+    note.textContent = "Each strategy places its own stop and target.";
+  } else if (sl === 0) {
+    note.textContent = "NO STOP LOSS on any bot trade. A losing position stays open with no "
+                     + "limit on what it can cost, until you close it or a kill switch fires. "
+                     + "Trailing stop and break-even are also switched off while this is Off "
+                     + "— they exist to place a stop, so they would undo this choice.";
+    note.classList.add("warn");
+  } else if (tp === 0) {
+    note.textContent = "No take profit: trades run until the stop is hit or you close them.";
   } else {
-    await fetch("/api/watchlist_mode", { method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ enabled: false }) });
+    const rr = tp / sl;
+    note.textContent = `Reward:risk ${rr.toFixed(2)}.`
+      + (rr < 1 ? " Below 1 means risking more than the trade is trying to make." : "");
+    if (rr < 1) note.classList.add("warn");
   }
-  loadWatchlist();
-};
-
-async function loadAnalytics() {
-  const res = await fetch("/api/analytics");
-  const data = await res.json();
-  document.getElementById("statWinRate").textContent = data.win_rate + "%";
-  document.getElementById("statProfitFactor").textContent = data.profit_factor;
-  document.getElementById("statStreak").textContent = data.current_streak;
-  drawEquityCurve(data.equity_curve || []);
-
-  const perStrategyRes = await fetch("/api/analytics/per_strategy");
-  const perStrategy = await perStrategyRes.json();
-  const body = document.getElementById("perStrategyBody");
-  body.innerHTML = "";
-  const entries = Object.entries(perStrategy);
-  if (entries.length === 0) {
-    body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="ph-bold ph-stack"></i><span>No per-strategy history yet.</span></div></td></tr>`;
-  }
-  entries.forEach(([strategy, stats]) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${strategy}</td><td>${stats.win_rate}%</td><td>${stats.profit_factor}</td><td>${stats.current_streak}</td>`;
-    body.appendChild(tr);
-  });
 }
 
-function drawEquityCurve(curve) {
-  const svg = document.getElementById("equityCurveSvg");
-  const empty = document.getElementById("equityCurveEmpty");
-  svg.innerHTML = "";
-  if (curve.length < 2) {
-    svg.style.display = "none";
-    empty.style.display = "flex";
-    return;
+async function saveBotStops() {
+  const { auto, sl, tp } = botStops();
+  if (!auto && sl === 0) {
+    const ok = await mmmConfirm("Run the bot with no stop loss?",
+      "Every trade the bot opens will have nothing to close it if the price moves against "
+      + "you. Losses are then limited only by the daily loss limit and the drawdown flatten, "
+      + "both of which act after the damage. This account's own history contains a group of "
+      + "825 trades that won 84% of the time and still lost $5.7M, because losses ran.",
+      { danger: true });
+    if (!ok) { document.getElementById("botSlAtr").value = 2; renderBotStops(); return; }
   }
-  svg.style.display = "block";
-  empty.style.display = "none";
-  const min = Math.min(...curve), max = Math.max(...curve);
-  const range = max - min || 1;
-  const points = curve.map((v, i) => {
-    const x = (i / (curve.length - 1)) * 600;
-    const y = 140 - ((v - min) / range) * 130 - 5;
-    return `${x},${y}`;
-  }).join(" ");
-  const style = getComputedStyle(document.documentElement);
-  const color = curve[curve.length - 1] >= curve[0] ? style.getPropertyValue("--mode") : style.getPropertyValue("--coral");
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  line.setAttribute("points", points);
-  line.setAttribute("fill", "none");
-  line.setAttribute("stroke", color);
-  line.setAttribute("stroke-width", "3");
-  line.setAttribute("stroke-linejoin", "round");
-  line.setAttribute("stroke-linecap", "round");
-  svg.appendChild(line);
+  await fetch("/api/global_settings", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ bot_stop_override_enabled: !auto,
+                            bot_sl_atr_multiple: sl, bot_tp_atr_multiple: tp }) });
+  renderBotStops();
 }
 
-document.getElementById("runSweepBtn").onclick = withLoading(document.getElementById("runSweepBtn"), async () => {
-  const res = await fetch("/api/backtest/sweep", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      symbol: document.getElementById("btSymbol").value || "EURUSD",
-      timeframe: document.getElementById("btTf").value,
-      strategy: "trend",
-      bars: Number(document.getElementById("btBars").value) || 500,
-      initial_equity: Number(document.getElementById("btEquity").value) || 10000,
-      param_grid: { fast_period: [5, 9, 13], slow_period: [21, 34, 50] },
-    }) });
-  const results = await res.json();
-  const body = document.getElementById("sweepBody");
-  body.innerHTML = "";
-  results.forEach(r => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.params.fast_period}</td><td>${r.params.slow_period}</td><td>${r.stats.profit_factor}</td><td>${r.stats.win_rate}%</td>`;
-    body.appendChild(tr);
-  });
+["botSlAtr", "botTpAtr"].forEach(id =>
+  document.getElementById(id).addEventListener("input", renderBotStops));
+["botSlAtr", "botTpAtr", "botStopAuto"].forEach(id =>
+  document.getElementById(id).addEventListener("change", saveBotStops));
+document.getElementById("botStopAuto").addEventListener("change", renderBotStops);
+renderBotStops();
+
+/* ---------- History: a plain record, nothing aggregated beyond the TOTAL row ---------- */
+let histPeriod = "all";
+
+function histTime(epochSeconds) {
+  const d = new Date(Number(epochSeconds) * 1000);
+  return isNaN(d.getTime()) ? "-" : d.toLocaleString();
+}
+
+async function loadHistory() {
+  const body = document.getElementById("historyBody");
+  const foot = document.getElementById("historyFoot");
+  body.innerHTML = `<tr><td colspan="8"><div class="empty-state"><span class="spinner"></span></div></td></tr>`;
+  let data;
+  try { data = await (await fetch(`/api/history?period=${histPeriod}`)).json(); }
+  catch (e) { body.innerHTML = ""; return; }
+  const num = (v) => Number(v).toFixed(2);
+  body.innerHTML = data.deals.length ? data.deals.map(d =>
+    `<tr><td>${escHtml(histTime(d.time))}</td><td>${escHtml(d.symbol)}</td>` +
+    `<td><span class="type-badge ${d.type === "BUY" ? "is-buy" : "is-sell"}">${escHtml(d.type)}</span></td>` +
+    `<td class="mono">${num(d.volume)}</td><td class="mono">${escHtml(d.price)}</td>` +
+    `<td class="mono ${d.profit >= 0 ? "pl-pos" : "pl-neg"}">${num(d.profit)}</td>` +
+    `<td class="mono">${num(d.commission)}</td><td class="mono">${num(d.swap)}</td></tr>`).join("")
+    : `<tr><td colspan="8"><div class="empty-state"><i class="ph-bold ph-tray"></i><span>No closed trades in this period.</span></div></td></tr>`;
+  const t = data.total;
+  foot.innerHTML = data.deals.length
+    ? `<tr class="total-row"><td colspan="3">TOTAL · ${t.count} trade${t.count === 1 ? "" : "s"}</td>` +
+      `<td class="mono">${num(t.volume)}</td><td></td>` +
+      `<td class="mono ${t.profit >= 0 ? "pl-pos" : "pl-neg"}">${num(t.profit)}</td>` +
+      `<td class="mono">${num(t.commission)}</td><td class="mono">${num(t.swap)}</td></tr>`
+    : "";
+  document.getElementById("histExportLink").href = `/api/history/export?period=${histPeriod}`;
+}
+
+document.querySelectorAll("#histPeriodSeg .seg-btn").forEach(btn => {
+  btn.onclick = () => {
+    histPeriod = btn.dataset.period;
+    document.querySelectorAll("#histPeriodSeg .seg-btn").forEach(b => b.classList.toggle("on", b === btn));
+    loadHistory();
+  };
 });
+document.getElementById("histRefreshBtn").onclick = withLoading(document.getElementById("histRefreshBtn"), loadHistory);
 
-async function loadAlerts() {
-  const res = await fetch("/api/alerts");
-  const rules = await res.json();
-  const body = document.getElementById("alertsBody");
-  body.innerHTML = "";
-  if (rules.length === 0) {
-    body.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="ph-bold ph-bell-slash"></i><span>No alerts set.</span></div></td></tr>`;
-  }
-  rules.forEach(r => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.symbol}</td><td>${r.condition}</td><td>${r.price}</td><td><button class="mmm-btn sm mmm-btn--mean" data-id="${r.id}"><i class="ph-bold ph-trash"></i></button></td>`;
-    tr.querySelector("button").onclick = async () => {
-      const ok = await mmmConfirm("Delete alert?", `Removes the ${r.symbol} ${r.condition} ${r.price} alert.`, { danger: true });
-      if (!ok) return;
-      await fetch(`/api/alerts/${r.id}`, { method: "DELETE" });
-      loadAlerts();
-    };
-    body.appendChild(tr);
-  });
-}
-document.getElementById("addAlertBtn").onclick = async () => {
-  await fetch("/api/alerts", { method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      symbol: document.getElementById("alertSymbol").value,
-      condition: document.getElementById("alertCondition").value,
-      price: Number(document.getElementById("alertPrice").value),
-    }) });
-  loadAlerts();
-};
+// History used to load ONLY when the tab was clicked or Refresh pressed, so a trade closing
+// while you watched never appeared. Poll it while it is on screen, like every other panel.
+// Slower than the account strip: closed deals change on the order of minutes, not ticks.
+let histInFlight = false;
+setInterval(async () => {
+  if (document.hidden || histInFlight) return;
+  if (document.getElementById("historyPanel").style.display === "none") return;
+  histInFlight = true;
+  try { await loadHistory(); } finally { histInFlight = false; }
+}, 3000);
 
-function beep() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.value = 880;
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  gain.gain.setValueAtTime(0.2, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.4);
+/* ---------- Polling ---------- */
+let refreshTimer = null;
+function setRefreshInterval() {
+  // Floor of 0.2s: a poll costs ~11ms server-side, so even that is a 6% duty cycle. The old
+  // floor of 1s was the only thing preventing a sub-second screen.
+  const seconds = Math.min(60, Math.max(0.2, Number(document.getElementById("setRefreshSeconds").value) || 0.5));
+  clearInterval(refreshTimer);
+  // A hidden tab still fired every poll, burning MT5 reads for a screen nobody is looking
+  // at. Also: refreshStatus and refreshAccount run together rather than racing on the same
+  // interval, so a slow one cannot stack up behind the next tick.
+  let inFlight = false;
+  refreshTimer = setInterval(async () => {
+    if (document.hidden || inFlight) return;
+    inFlight = true;
+    try { await Promise.all([refreshStatus(), refreshAccount()]); }
+    finally { inFlight = false; }
+  }, seconds * 1000);
 }
 
-let ackedIds = new Set();
-async function checkTriggeredAlerts() {
-  const res = await fetch("/api/status");
-  const data = await res.json();
-  const banner = document.getElementById("alertBanner");
-  const fresh = (data.triggered_alerts || []).find(t => !ackedIds.has(t.id));
-  if (fresh) {
-    document.getElementById("alertBannerText").textContent = fresh.type === "margin" ? "Margin alert: " + fresh.message : `Price alert: ${fresh.symbol} ${fresh.condition} ${fresh.price}`;
-    banner.classList.add("show");
-    ackedIds.add(fresh.id);
-    beep();
-    fetch(`/api/alerts/ack/${fresh.id}`, { method: "POST" });
-    setTimeout(() => { banner.classList.remove("show"); }, 8000);
-  }
-}
-setInterval(checkTriggeredAlerts, 3000);
+// Coming back to the tab should show current numbers at once, not after the next interval.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  refreshStatus(); refreshAccount();
+  if (document.getElementById("historyPanel").style.display !== "none") loadHistory();
+});
 
 renderTabs();
 renderSettingsForm();
+loadGlobalSettings();
 refreshStatus();
-setInterval(refreshStatus, 2000);
+refreshAccount();
+setRefreshInterval();
 </script>
 </body>
 </html>

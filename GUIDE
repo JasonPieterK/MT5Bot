@@ -11,15 +11,12 @@ A complete walkthrough: install, first run, and every dashboard tab explained. I
 3. [Install](#install)
 4. [First run](#first-run)
 5. [Dashboard tour](#dashboard-tour)
-   - [Top bar](#top-bar)
-   - [Live stats & strategy settings](#live-stats--strategy-settings)
-   - [Position manager](#position-manager)
-   - [Analytics](#analytics)
-   - [Alerts](#alerts)
-   - [Watchlist](#watchlist)
-   - [Backtest](#backtest)
-   - [Signal filters](#signal-filters)
-   - [Accounts](#accounts)
+   - [Account strip & top bar](#account-strip--top-bar)
+   - [Dashboard](#dashboard)
+   - [Why no trade?](#why-no-trade)
+   - [History](#history)
+   - [Settings](#settings)
+   - [Advanced](#advanced)
    - [Logs](#logs)
 6. [Choosing a strategy](#choosing-a-strategy)
 7. [Recommended first-time setup](#recommended-first-time-setup)
@@ -36,7 +33,6 @@ This software places, modifies, and closes **real trades** on whatever MT5 accou
 - **Demo account first.** Every feature, every strategy, every filter — run it on demo until you understand exactly what it does. Do this for at least several days of live market conditions, not a few minutes.
 - **Read the full disclaimer** in [README.md](README.md#risk-disclaimer). You are solely responsible for anything this bot does on your account.
 - **The Grid strategy has hardcoded safety caps** (max levels, max total lots, equity stop) that are *not* editable from the UI on purpose — that's intentional, not a bug.
-- **The trading lock is a local convenience**, not real security — it stops accidental clicks, not a determined attacker with access to your machine.
 
 ## Requirements
 
@@ -83,107 +79,63 @@ If equity stays at `-` or `0`, see [Troubleshooting](#troubleshooting).
 
 ## Dashboard tour
 
-### Top bar
+Six tabs, in the left rail.
 
-| Element | What it does |
-|---|---|
-| Symbol field | Free-text — type any symbol your broker offers, not just the 4 presets in the dropdown suggestions. |
-| Timeframe | M1 / M5 / M15 / H1 — applies to the currently selected single-symbol strategy. |
-| Strategy dropdown | Which strategy runs when Auto is on (single-symbol mode). Includes **Ensemble** — see [Choosing a strategy](#choosing-a-strategy). |
-| **Auto: off / live** | The master switch. Clicking it while off asks you to confirm, then (if a trading lock is set) asks for your passcode. This is the one button that actually arms real trading. |
-| Nav chips (Position mgr, Analytics, …) | Switch between panels. The active one highlights. |
-| **Close all** | Immediately market-closes every open position on the account. Always asks for confirmation first. |
+### Account strip & top bar
 
-### Live stats & strategy settings
+Visible on every tab. **Balance**, **Equity**, **Free margin**, **Open P&L** (green/red) and **Server**, read live from the terminal. The header shows the account number, broker, currency, and a DEMO/REAL badge — check that badge before arming anything.
 
-Always visible on the left/main area:
+The top bar also holds the symbol box, timeframe, strategy, and the trading-mode control (**Off** / **Single symbol**).
 
-- **Live stats**: equity, open position count, active strategy, symbol/timeframe — refreshes every 2 seconds.
-- **Strategy settings**: tabs for each of the 5 strategies. Click a tab, edit any field, **Save settings**. Changes apply on the *next* engine tick (within 5 seconds) — no restart needed.
-- **Open positions** table: every open position on the account, with a note icon per row — click it to attach a personal note to that ticket (saved server-side, survives restarts).
+The symbol box suggests only symbols your broker will actually accept an order on. This matters more than it sounds: many brokers list a disabled duplicate alongside the tradeable one (XM lists `EURUSD`, which cannot be traded, next to `EURUSD#`, which can), and gold is often not `XAUUSD` at all. If you type a name the broker renames, the bot resolves it and logs the mapping; if the name is ambiguous it refuses rather than guessing, because guessing could trade a gold *mining stock* instead of gold.
 
-### Position manager
+### Dashboard
 
-Applies to **every open position on the account**, regardless of which strategy (or you, manually) opened it.
+- **Trading profile** — pick a risk preset (capital preservation → high risk). A profile sets risk %, lot ceiling, max concurrent trades, daily loss limit, max drawdown and minimum reward:risk together, and those bounds are hard: nothing at runtime may exceed them. Applying one shows exactly what will change, and the **effective** risk it produces.
+- **Auto mode** (off by default) — lets the bot pick the strategy from realised results and shrink size after losing streaks, always inside the active profile. It will refuse to pick a strategy until a strategy has at least 30 closed trades; below that there is nothing to choose on and it says so.
+- **Bot stop & target** — how far the stop loss and take profit sit from entry, as a multiple of ATR (the symbol's average candle range, so the distance tracks how much it is currently moving). Sliding either fully left switches that side off entirely.
 
-| Setting | What it does |
-|---|---|
-| Trailing enabled / distance | Once enabled, trails the stop-loss behind price by the given distance (in points) on every open position. |
-| Break-even enabled / trigger / offset | Moves stop-loss to entry + offset once price has moved `trigger` points in profit. |
-| Partial TP enabled / trigger / fraction | Closes `fraction` of the position once price moves `trigger` points in profit, then moves the remainder's SL to break-even. Fires once per ticket. |
-| Margin alert level % | Triggers a margin alert (see [Alerts](#alerts)) when margin level drops below this. |
-| Portfolio risk filter / max % | Blocks new trades once total $-at-risk across all open positions exceeds this % of equity. |
-| Swap filter | Blocks new entries in a window before daily rollover (avoids opening a position right before eating swap). |
-| Schedule filter | Flattens everything and stops new entries near a chosen weekday/hour (default: Friday close). |
-| Watchdog webhook URL | Any URL that accepts a JSON POST (`{"text": "..."}`) — Telegram bot API, Slack/Discord incoming webhook, or your own endpoint. Used for disconnect alerts and (if enabled in Signal Filters) trade-open notifications. |
+  Leave **"Let each strategy choose its own levels"** ticked and nothing changes: Trend and Scalping place stops from volatility, SMC from the prior swing, Pivot breakout from the pivot level. Untick it and the sliders decide for every strategy, always — if the distance cannot be computed the bot skips the trade rather than quietly falling back to the strategy's numbers.
 
-**Apply now to all positions** runs trailing/break-even/partial-TP immediately instead of waiting for the next tick. **Save state now** force-saves current settings to disk (they also auto-save every engine tick).
+  With the stop slider **Off**, trailing stop and break-even also stand down, because their whole job is to place a stop and they would undo the choice. Nothing then closes a losing trade automatically.
+- **Open positions** — ticket, symbol, type, lots, entry, TP, SL, profit, with a per-row close.
 
-**Trading lock**: check the box, set a passcode, save. From then on, enabling Auto or Watchlist mode asks for that passcode. Turning trading *off* never requires it — you can always stop the bot with one click.
+### Why no trade?
 
-### Analytics
+The tab to open when the bot isn't doing anything. For each symbol/strategy it is running, it reports the most recent evaluation:
 
-Sourced from your **full MT5 account history**, not just this bot's own trades — so manual trades count too.
+- **No signal** — healthy and common. The strategy looked and saw no setup.
+- **Waiting for the next bar** — it already acted on this bar.
+- **Blocked** — a signal existed and a named gate refused it. The gate is named, with the actual numbers (lots needed vs allowed, computed reward:risk vs the floor, stop distance, spread vs threshold) and a concrete remedy.
+- **Order sent** — signal found, every gate passed.
 
-- Win rate, profit factor, current streak (last 30 days).
-- **Equity curve** — a simple line chart of cumulative P&L over your recent closed deals.
-- **Per-strategy breakdown** — win rate/profit factor/streak split out by which strategy (via an internal "magic number" tag) opened each trade. Needs enough closed trades per strategy to show up.
-- **Export CSV** — downloads the raw deal list.
+It also shows **risk reality** before any signal exists: the risk you configured versus the most this account can actually express given the broker's lot cap. If those differ, your risk setting is fiction and this is where you find out.
 
-### Alerts
+**Run diagnostic** asks MT5 itself what is blocking trading — algo trading switched off, an investor (read-only) login, a symbol the broker has disabled, a symbol missing from Market Watch, or a wrong symbol name — and reports each with its fix.
 
-- **Price alerts**: symbol, above/below, price. Fires once, then removes itself. Shows as a banner + audible beep when triggered.
-- **Blackout windows**: manually-entered UTC time ranges (e.g. around an NFP release) during which no *new* entries are placed. Doesn't touch existing positions — combine with the schedule filter in Position Manager if you also want to flatten.
+### History
 
-### Watchlist
+Every closed deal: time, symbol, BUY/SELL, volume, price, profit, commission, swap. Filter by All / 1 week / 1 month / 3 months, export to CSV, and a TOTAL row sums volume and profit.
 
-Trade multiple symbols at once instead of the single symbol/strategy pair in the top bar.
+### Settings
 
-1. Add entries: symbol, timeframe, strategy, mode.
-   - **auto** — actually places trades for that entry.
-   - **alert_only** — computes the signal but never trades, just logs it under "Manual Signals" below.
-2. Toggle individual entries on/off with the checkbox.
-3. Flip **Watchlist mode: off → live** to switch the whole engine from single-symbol mode to running every enabled watchlist entry. This replaces the top-bar Auto toggle — only one mode runs at a time.
+Day-to-day controls: risk per trade, max lot, max concurrent trades, daily loss limit, max drawdown, slippage, minimum reward:risk, max stop distance (×ATR), whether to refuse trades when the broker lot cap binds, the portfolio risk cap, screen refresh interval, the automated position management toggles (trailing stop, break-even, partial take-profit), swap and schedule blocks, and the watchdog webhook. Every control saves itself as you change it — there is no Save button.
 
-Grid strategy isn't available in the watchlist (its per-symbol state tracking doesn't generalize to shared multi-symbol exposure — use single-symbol mode for grid).
+The automated trailing stop, break-even and partial take-profit live here. **These are what close your positions** — there is no manual position-management screen.
 
-### Backtest
+### Advanced
 
-Bar-by-bar simulation using the exact same strategy and risk code as live trading — no MT5 Strategy Tester needed.
+Everything whose wrong value can silently stop the bot trading:
 
-1. Set symbol, timeframe, strategy, how many historical bars to pull, and starting equity.
-2. **Run** — shows win rate, profit factor, trade count, streak.
-3. **Parameter sweep** (trend strategy only) tries every combination of fast/slow MA period from a small preset grid and ranks results by profit factor — a quick way to see if your current settings are in a reasonable neighborhood.
+- **Per-strategy parameters** — the settings block for whichever strategy is selected.
+- **Signal filters**, all opt-in and off by default: session hours, correlation exposure cap, higher-timeframe bias, volatility regime, spread quality, tick momentum, ML win-probability, ensemble agreement, confidence sizing, anti-martingale streak sizing.
+- **Train ML filter** and **Run auto-tune**.
 
-Known limitation: no spread/slippage/commission modeled, so live results will always be somewhat worse than backtest results. Treat it as a sanity check, not a promise.
-
-### Signal filters
-
-Every filter here is **off by default** — nothing changes until you turn one on.
-
-| Filter | Effect |
-|---|---|
-| Session filter | Only trade within a UTC hour range. |
-| Correlation filter | Caps how many positions you can hold in correlated pairs at once (e.g. EURUSD + GBPUSD). |
-| HTF bias filter | Blocks signals that fight the higher-timeframe trend direction. |
-| Volatility regime filter | Skips entries when current volatility is in the top third of recent history. |
-| Confidence sizing | Scales position size up/down based on the trade's reward:risk ratio. |
-| Streak (anti-martingale) sizing | Shrinks position size after consecutive losing trades. |
-| Spread quality filter | Rejects entries when the current spread is wide vs. recent average — uses data already in the price bars, no extra cost. |
-| Tick momentum filter | Requires recent tick-by-tick price direction to agree with the signal before entering. |
-| ML win-probability filter | Filters out signals below a trained win-probability threshold. Train it first with **Train ML filter** — needs at least 10 of your own closed, bot-tagged trades. It only knows strategy/hour-of-day/day-of-week; MT5's trade history has no stored stop-loss/take-profit, so reward:risk isn't a feature here. |
-| Ensemble min agree | How many of the 4 directional strategies must agree before the Ensemble strategy fires a trade. |
-| Auto-tune | See below. |
-
-**Run auto-tune now**: looks at your last 30 days of per-strategy results, flags any strategy with a poor profit factor *and* enough trades to be statistically meaningful (default: 10+), and reports the current best performer. If **Auto-tune enabled** is checked and your currently active strategy is flagged, it switches you to the best one automatically. Otherwise it's just a suggestion — nothing changes until you enable that checkbox.
-
-### Accounts
-
-Save multiple MT5 login profiles (name, terminal path, login, password, server) and switch between them with **Connect**. One MT5 terminal process can only be logged into one account at a time — this is a login switcher, not simultaneous multi-account trading.
+If the bot has gone quiet after you changed something here, the Why no trade? tab will name the filter responsible.
 
 ### Logs
 
-A live, plain-English feed of everything the bot does — connection state, every order placed or rejected, trailing/break-even/partial-TP actions, triggered alerts, kill-switch flattens, account connects, and every caught error, each with a timestamp. Auto-refreshes every 3 seconds while the tab is open (toggle off if you're scrolled up reading older entries). Same content lives at `logs/app.log` on disk, so you can check it even if the dashboard itself fails to load. Any API call that fails also pops a small error toast in the bottom-left corner immediately, regardless of which tab you're on.
+Plain-English record of everything the bot does, auto-refreshing. Same content as `logs/app.log` on disk — open that file directly if the dashboard itself won't start.
 
 ## Choosing a strategy
 
@@ -198,26 +150,71 @@ A live, plain-English feed of everything the bot does — connection state, ever
 
 ## Recommended first-time setup
 
-1. Demo account, connected and confirmed (equity showing correctly).
-2. Pick one strategy (Trend is the simplest to reason about) on a symbol you know.
-3. Leave every Signal Filter off and every Position Manager automation off, at first — understand the raw strategy behavior before layering filters on top.
-4. Set a conservative `risk_percent` in the strategy's settings tab (1% or less).
-5. Turn Auto on, watch it for a full session or two on demo.
-6. Once comfortable, add one filter/automation at a time (e.g. trailing stop, then a signal filter), re-observing behavior after each change.
-7. Only after real demo track record and full understanding: consider a live account, starting small.
+1. Demo account, connected and confirmed — the account strip should show your real balance and a DEMO badge.
+2. **Check the symbol name.** Type it into the symbol box and confirm the suggestion list offers it. If your broker uses suffixes, use the suffixed name.
+3. Apply a **trading profile** — start at Capital preservation or Conservative. Read the effective risk it reports; if it differs sharply from the requested figure, the broker's lot cap is binding and that gap is real.
+4. Pick one strategy (Trend is the simplest to reason about) on a symbol you know.
+5. Leave every Signal Filter off, at first — understand the raw strategy behaviour before layering filters on top. Leave Auto off too.
+6. Turn trading on, then **open Why no trade?** and watch what it says. Most of the time it should read "no signal", which is normal. If it reports a blocked gate, fix that before going further.
+7. Watch a full session or two on demo. Judge it on payoff ratio and worst drawdown, **not** win rate — a high win rate with a poor payoff ratio is the classic way to lose an account slowly and then all at once.
+8. Only after a real demo track record and full understanding: consider a live account, starting small.
+
+> **Set expectations honestly.** No strategy in this project has a demonstrated edge — see the note at the top of [README.md](README.md). Treat a demo session as a test of whether the machinery behaves correctly, not as evidence the bot makes money.
 
 ## On-chart status panel (MQL5)
 
-Optional. `mql5/MT5BotStatusPanel.mq5` is a small Expert Advisor that mirrors the app's status directly on an MT5 chart — auto/live state, active strategy, symbol/TF, equity, open positions, and how stale the data is. **It never places, modifies, or closes trades** — it only reads a status file the Python app writes every ~5s and draws labels. All trading logic stays in the Python app.
+Optional. `mql5/MT5BotStatusPanel.mq5` is a small Expert Advisor that mirrors the app's status directly on an MT5 chart, in the same Graphite & Amber palette as the dashboard. **It never places, modifies, or closes trades** — it only reads a status file the Python app writes every ~5s and draws labels. All trading logic stays in the Python app.
 
 Setup:
 1. In MT5: File → Open Data Folder → `MQL5/Experts/`. Copy `MT5BotStatusPanel.mq5` there.
 2. Open MetaEditor (F4 in MT5), open the file, compile (F7).
 3. In MT5's Navigator, drag `MT5BotStatusPanel` onto any chart (doesn't need to be the symbol you're trading).
 4. MT5 requires "Allow Algo Trading" enabled for *any* EA to run its timer — turn it on even though this EA never trades.
-5. With `app.py` running, the panel populates within a second or two. If it says "app not found", the Python app isn't running or hasn't written its first status snapshot yet.
+5. With `app.py` running, the panel populates within a second or two. If it says **OFFLINE**, the Python app isn't running or hasn't written its first status snapshot yet.
 
 The two processes sync via a plain text file in MT5's shared Common Files folder (`%APPDATA%\MetaQuotes\Terminal\Common\Files\mt5_bot_status.txt`) — no HTTP, no WebRequest allowlist needed.
+
+### Reading the panel
+
+The header carries a coloured dot and a one-word state; the panel's whole border takes that colour too, so a broken feed is obvious from across the room.
+
+| Header | Border | What it means |
+|---|---|---|
+| **ARMED** (amber) | amber | Trading mode is `single` and the data is fresh. The bot is live on your account. |
+| **IDLE** (grey) | grey | App is running and reporting, trading mode is `off`. Nothing will be traded. |
+| **STALE** (red) | red | The app hasn't written an update within your stale threshold. Every value greys out — **do not trust the numbers**, they're a snapshot from before the app stopped. |
+| **NO DATA** (red) | red | The status file exists but is empty or unreadable. |
+| **OFFLINE** (red) | red | No status file at all — the Python app isn't running. |
+
+Rows, top to bottom. Labels sit left, values right-aligned in a fixed-width font so the numbers line up as a column.
+
+| Row | What it shows |
+|---|---|
+| **Mode** | `off` / `single` — the app's trading mode, verbatim. Amber when armed. |
+| **Strategy** | The strategy that runs in single-symbol mode. |
+| **Symbol** | Symbol and timeframe the single-symbol strategy is set to. |
+| **Equity** | Account equity as of the last update. `0.00` means the terminal isn't connected — see [Troubleshooting](#troubleshooting). |
+| **Drawdown** | How far equity is below its highest observed value. Green `at peak` when you're at the high-water mark, red once it passes the alert threshold below. |
+| **Positions** | Open positions on the account, all strategies plus anything you opened by hand. |
+| Footer | How long ago the app last wrote. Turns red with "NO UPDATE FOR…" once stale. |
+
+The Equity / Drawdown / Positions block sits on a raised strip — those are the three numbers worth glancing at, grouped so you don't have to hunt for them.
+
+### Panel inputs
+
+Right-click the chart → Expert List → Properties (or press F7 on the chart) to change these. All optional; the defaults sit in the top-left corner clear of price action.
+
+| Input | Default | What it does |
+|---|---|---|
+| `InpCorner` | `CORNER_LEFT_UPPER` | Which chart corner the panel anchors to. All four work; the layout stays right-aligned whichever you pick. |
+| `InpOffsetX` | `12` | Pixels in from that corner, horizontally. |
+| `InpOffsetY` | `22` | Pixels in from that corner, vertically. `22` clears MT5's own symbol/period label in the top-left. |
+| `InpFontSize` | `9` | Point size, clamped to 6–16. The panel resizes with it (9pt ≈ 234×215px, 16pt ≈ 416×271px). |
+| `InpRefreshSeconds` | `1` | How often to re-read the status file. |
+| `InpStaleAfterSeconds` | `15` | Data older than this flips the panel to STALE. The app writes every ~5s, so 15 tolerates two missed writes. Minimum 3. |
+| `InpDrawdownAlertPct` | `5.0` | Drawdown at or past this percent turns the Drawdown row red. Set it to your own risk tolerance. |
+
+The panel re-lays itself out on chart resize and timeframe changes, and removing the EA deletes every object it created.
 
 ## Troubleshooting
 
@@ -227,14 +224,25 @@ Check the **Logs** tab in the dashboard first — it's a plain-English feed of e
 **Equity shows `-` or `0`**
 MT5 terminal isn't connected, or the bot connected before the terminal finished logging in. Confirm the terminal itself shows your account balance, then restart `start.bat`. Check the Logs tab / `logs/app.log` for a "Lost connection to MT5 terminal" line.
 
-**"Status: app not found" on the on-chart panel**
-The Python app isn't running, or hasn't written its first status file yet (takes up to ~5s after Auto/Watchlist mode's first tick — actually, the status file is written every engine tick even with Auto off, so this should populate within seconds of `start.bat` running). Confirm `app.py` is actually running in your terminal window.
+**"OFFLINE" or "STALE" on the on-chart panel**
+`OFFLINE` means no status file exists — the Python app isn't running, or hasn't written its first snapshot yet (the file is written every engine tick even with Auto off, so it should appear within seconds of `start.bat` running). Confirm `app.py` is actually running in your terminal window.
 
-**Wrong passcode alert when enabling Auto**
-Trading lock is on and you mistyped it. Passcodes are stored in-memory/persisted state exactly as entered, case-sensitive.
+`STALE` means the file exists but stopped being updated: the app crashed, was closed, or its engine loop is wedged. The panel greys out every value when this happens — the numbers on screen are from before it stopped, so don't act on them. Check the Logs tab / `logs/app.log` for the last thing the engine did.
 
 **A strategy never fires a signal**
-Check its settings tab — thresholds may be too strict for current market conditions. Try the Backtest tab with the same settings against recent history to see if it fires there.
+Open **Why no trade?** — it names exactly what happened on the last evaluation. "No signal" means the strategy genuinely sees no setup, which is normal and common; a named gate means something is refusing the trade. If it is always "no signal", the strategy's thresholds in **Advanced** may be too strict for current conditions.
+
+**"Trade REFUSED: broker lot cap binding"**
+Your risk setting cannot be expressed at this account size. Example: 1% of a $5.4M account over a 10-pip stop needs ~490 lots, but the broker allows 50. Rather than silently trade at a risk model you did not choose — where a 10-pip stop and a 100-pip stop both go out at maximum size — the bot refuses and tells you the largest risk it *can* express. Either lower `risk_percent` to the figure it names, apply a trading profile (which computes it for you), or set `block_when_lot_capped` off to accept capped sizing.
+
+**"MT5 Bot is already running (process NNNN)"**
+A second copy is blocked on purpose: two engines would see the same signal and place every trade twice, at double your risk. Close the other window. If nothing is actually running, delete `logs/app.lock`.
+
+**Orders are placed but have no stop loss or take profit**
+Fixed, but worth knowing the symptom: prices must carry exactly the symbol's decimal precision. An unrounded stop is rejected by MT5, and some brokers fill the deal while silently dropping the stop — leaving a position open with no protection. If you ever see a position with `sl=0`, close it or attach a stop by hand, and check `logs/app.log` for the order line.
+
+**"Trading is DISABLED (retcode 10017)"**
+Either MT5's Algo Trading button is off, you are logged in with an investor (read-only) password, or the broker has disabled that specific symbol — some brokers list a disabled duplicate of a tradeable symbol. Press **Run diagnostic** on the Why no trade? tab; it asks MT5 which of these it is.
 
 **Auto shows "off" after restarting the app, even though it was on before**
 Intentional. Trading never auto-resumes from a restart — you must explicitly re-arm it every time the app starts. This is a safety guarantee, not a bug.
@@ -250,7 +258,8 @@ Also intentional — those caps are hardcoded in `src/strategies/grid.py`, not e
 | `logs/trades.csv` | Every order this bot placed (time, symbol, strategy, signal, lots, sl, tp, retcode) — machine-readable twin of the trade lines in `app.log`. |
 | `logs/execution.csv` | Order latency and requote tracking per symbol. |
 | `logs/events.jsonl` | Structured JSON event log, rotates at 5MB. |
-| `logs/app_state.json` | Persisted settings/watchlist/blackouts/accounts — auto-loaded on startup (trading-armed flags always reset, see above). |
+| `logs/app_state.json` | Persisted settings and strategy parameters — auto-loaded on startup (trading mode always resets to off, see above). Written atomically; a damaged file is set aside rather than crashing the app. **No account credentials are stored here or anywhere else** — the bot uses whichever account your MT5 terminal is logged into. |
+| `logs/app.lock` | Holds the running app's process id, so a second copy refuses to start. Safe to delete if the app was killed and won't restart. |
 | `logs/journal.json` | Your per-ticket trade notes. |
 | `logs/ml_weights.json` | Trained ML filter weights. |
 | `%APPDATA%\MetaQuotes\Terminal\Common\Files\mt5_bot_status.txt` | Status snapshot read by the optional MQL5 panel. |

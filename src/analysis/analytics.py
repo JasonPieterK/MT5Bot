@@ -47,6 +47,9 @@ STRATEGY_MAGIC = {
     "smc": 1003,
     "grid": 1004,
     "pivot_breakout": 1005,
+    # Without this every ensemble trade went out with magic=0, which per-strategy
+    # analytics, auto-tune and ML training all silently discard.
+    "ensemble": 1006,
 }
 
 

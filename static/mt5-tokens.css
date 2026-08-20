@@ -1,0 +1,293 @@
+/* ============================================================
+   MT5 Bot — "Graphite & Amber" design tokens
+   Dark-only. 60-30-10:
+     60% graphite neutrals  (#0F1115 / #171A20 / #1E222A)
+     30% slate structure    (#2A303B borders, #9BA3AF muted, #E6E8EC text)
+     10% amber accent       (#F5A524 — CTAs, active nav, focus, live)
+     semantic, DATA ONLY    (#22C55E buy/profit, #EF4444 sell/loss/danger)
+
+   Variable NAMES are unchanged from the previous palette on purpose:
+   the inline <script> reads --mode / --coral via getPropertyValue(),
+   and dashboard.html references --spring/--median/--ink/etc everywhere.
+   Only the VALUES changed (plus a few new tokens at the bottom).
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ---------- 60% — GRAPHITE (dominant neutral) ---------- */
+  --graphite-1: #0F1115;   /* app background */
+  --graphite-2: #171A20;   /* card / panel surface */
+  --graphite-3: #1E222A;   /* raised surface: inputs, table header, chips */
+
+  /* ---------- 30% — SLATE / STEEL (structure + text) ---------- */
+  --steel:      #2A303B;   /* borders & dividers */
+  --steel-2:    #232833;   /* soft hairline */
+  --slate-text: #9BA3AF;   /* secondary / muted text */
+  --plain-text: #E6E8EC;   /* primary text */
+
+  /* ---------- 10% — AMBER (accent, used sparingly) ---------- */
+  --amber:      #F5A524;
+  --amber-dim:  #C4831D;
+
+  /* ---------- SEMANTIC (data only, never chrome) ---------- */
+  --buy:        #22C55E;
+  --sell:       #EF4444;
+
+  /* ---------- Legacy brand aliases (kept so existing markup works) ---------- */
+  --spring:     var(--amber);        /* accent */
+  --midnight:   var(--graphite-1);   /* page bg / text on amber */
+  --midnight-2: var(--graphite-2);
+  --midnight-3: var(--graphite-3);
+  --mantis:     var(--buy);
+  --bookgrn:    #16A34A;
+  --nuit:       var(--amber);        /* primary-CTA colour slot */
+  --praxeti:    var(--plain-text);
+  --sellred:    var(--sell);
+
+  --mean:     var(--sell);           /* destructive buttons */
+  --median:   var(--amber);          /* primary CTA / focus ring */
+  --mode:     var(--buy);            /* profit / equity-curve-up */
+  --quartile: var(--amber);
+
+  --q1: var(--amber);
+  --q2: var(--buy);
+  --q3: var(--sell);
+
+  --sun:   var(--amber);
+  --coral: var(--sell);              /* equity-curve-down */
+  --plum:  var(--amber);
+
+  --mean-50:     rgba(239,68,68,0.14);
+  --median-50:   rgba(245,165,36,0.10);
+  --mode-50:     rgba(34,197,94,0.12);
+  --quartile-50: rgba(245,165,36,0.10);
+  --sun-50:      rgba(245,165,36,0.12);
+  --coral-50:    rgba(239,68,68,0.14);
+  --plum-50:     rgba(245,165,36,0.10);
+
+  /* ---------- Neutrals ---------- */
+  --ink:    var(--steel);            /* hairline / structural border slot */
+  --ash:    var(--slate-text);
+  --bone:   var(--graphite-3);       /* table headers, off chips */
+  --paper:  var(--graphite-2);       /* card / control surface */
+  --cream:  var(--graphite-3);       /* callout bg */
+  --field:  var(--graphite-3);       /* input / <pre> surface */
+  --white:  #FFFFFF;
+
+  /* ---------- SEMANTIC ---------- */
+  --fg-1:   var(--plain-text);
+  --fg-2:   var(--slate-text);
+  --fg-inv: var(--graphite-1);       /* text on amber */
+
+  --bg-1: var(--graphite-3);
+  --bg-2: var(--graphite-1);
+  --bg-flood-mean:   var(--mean);
+  --bg-flood-median: var(--median);
+  --bg-flood-mode:   var(--mode);
+
+  --border:      var(--steel);
+  --border-soft: var(--steel-2);
+
+  --link:    var(--amber);
+  --success: var(--buy);
+  --warning: var(--amber);
+  --danger:  var(--sell);
+
+  /* ---------- TYPOGRAPHY ---------- */
+  --font-hero:    'Unbounded', system-ui, sans-serif;
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-hand:    'DM Sans', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --fs-hero:   clamp(56px, 8vw, 128px);
+  --fs-h1:     clamp(40px, 5vw, 64px);
+  --fs-h2:     clamp(28px, 3.5vw, 40px);
+  --fs-h3:     22px;
+  --fs-h4:     18px;
+  --fs-body:   15px;
+  --fs-small:  13px;
+  --fs-micro:  11px;
+
+  --lh-tight:  1.05;
+  --lh-snug:   1.2;
+  --lh-body:   1.55;
+
+  --tracking-display: -0.02em;
+  --tracking-body:    0;
+  --tracking-caps:    0.06em;
+
+  /* ---------- SPACING ---------- */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
+  --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px; --s-10: 128px;
+
+  /* ---------- RADII ---------- */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-pill: 999px;
+
+  /* ---------- BORDERS ---------- */
+  --bw:      1px;
+  --bw-thin: 1px;
+
+  /* ---------- SHADOWS (ambient, no sticker offsets on graphite) ---------- */
+  --sh-1:  0 1px 2px rgba(0,0,0,0.45);
+  --sh-2:  0 3px 8px rgba(0,0,0,0.5);
+  --sh-3:  0 8px 20px rgba(0,0,0,0.55);
+  --sh-4:  0 14px 34px rgba(0,0,0,0.6);
+  --sh-soft: 0 1px 3px rgba(0,0,0,0.4);
+
+  /* ---------- MOTION ---------- */
+  --ease-bounce: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-out:    cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in:     cubic-bezier(0.6, 0, 0.8, 0.2);
+
+  --dur-micro:  120ms;
+  --dur-std:    200ms;
+  --dur-big:    420ms;
+
+  /* ---------- LAYOUT ---------- */
+  --maxw-text:  880px;
+  --maxw-page:  1200px;
+  --maxw-wide:  1560px;
+  --nav-h:      64px;
+}
+
+html, body {
+  background: var(--bg-2);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, .h1, h2, .h2, h3, .h3, h4, .h4, .hero {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--lh-tight);
+  color: var(--fg-1);
+  margin: 0;
+}
+
+.hero { font-family: var(--font-hero); font-size: var(--fs-hero); font-weight: 400; letter-spacing: -0.02em; }
+h1, .h1 { font-size: var(--fs-h1); }
+h2, .h2 { font-size: var(--fs-h2); line-height: var(--lh-snug); }
+h3, .h3 { font-size: var(--fs-h3); line-height: var(--lh-snug); }
+h4, .h4 { font-size: var(--fs-h4); line-height: var(--lh-snug); font-weight: 700; }
+
+p { margin: 0 0 var(--s-4); max-width: 72ch; }
+
+.hand   { font-family: var(--font-hand); font-weight: 700; }
+.mono   { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+a { color: var(--link); text-decoration: none; font-weight: 500; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+code, pre, kbd {
+  font-family: var(--font-mono);
+  background: var(--graphite-3);
+  color: var(--fg-1);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+}
+
+/* Signature card — graphite surface, steel hairline */
+.mmm-card {
+  background: var(--paper);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-3);
+  padding: var(--s-5);
+}
+
+/* Signature button — primary CTA is amber (the 10%) */
+.mmm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0;
+  line-height: 1.2;
+  padding: 9px 16px;
+  border: var(--bw) solid var(--amber);
+  border-radius: var(--r-sm);
+  background: var(--amber);
+  color: var(--fg-inv);
+  box-shadow: var(--sh-1);
+  cursor: pointer;
+  min-width: 0;
+  transition: filter var(--dur-micro) var(--ease-out),
+              box-shadow var(--dur-micro) var(--ease-out);
+}
+.mmm-btn:hover  { filter: brightness(1.1); box-shadow: var(--sh-2); }
+.mmm-btn:active { filter: brightness(0.92); box-shadow: none; }
+.mmm-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.mmm-btn--mean   { background: var(--sell); border-color: var(--sell); color: #fff; }
+.mmm-btn--mode   { background: var(--buy);  border-color: var(--buy);  color: var(--graphite-1); }
+.mmm-btn--ghost  { background: var(--graphite-3); color: var(--fg-1); border-color: var(--border); }
+.mmm-btn--ghost:hover { background: var(--steel); filter: none; }
+
+/* Inputs */
+.mmm-input {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 12px;
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--field);
+  color: var(--fg-1);
+  box-shadow: none;
+  transition: border-color var(--dur-micro) ease, box-shadow var(--dur-micro) ease;
+}
+.mmm-input:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px rgba(245,165,36,0.25); }
+
+/* Decorative grid background */
+.mmm-grid-bg {
+  background-image:
+    linear-gradient(rgba(230,232,236,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(230,232,236,0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ---------- Tooltip layer (JS-positioned, position:fixed so nothing clips it) ---------- */
+#tipLayer {
+  position: fixed;
+  z-index: 3000;
+  max-width: 280px;
+  padding: 8px 11px;
+  background: var(--graphite-3);
+  color: var(--fg-1);
+  border: 1px solid var(--steel);
+  border-left: 2px solid var(--amber);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-4);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+#tipLayer.show { opacity: 1; transform: translateY(0); }
+[data-tip] { cursor: help; }
+button[data-tip], a[data-tip], .tab[data-tip], .chip[data-tip] { cursor: pointer; }
+input[data-tip], select[data-tip] { cursor: auto; }

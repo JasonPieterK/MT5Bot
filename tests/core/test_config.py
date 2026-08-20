@@ -19,18 +19,37 @@ def test_state_defaults():
     state = config.new_state()
     assert state["active_strategy"] == "trend"
     assert state["symbol"] == "EURUSD"
-    assert state["timeframe"] == "M5"
-    assert state["auto_enabled"] is False
+    assert state["timeframe"] == "H1"
+    assert state["trading_mode"] == "off"
 
-def test_state_has_watchlist_enabled_false_by_default():
-    assert config.new_state()["watchlist_enabled"] is False
-
-def test_new_watchlist_entry_shape():
-    entry = config.new_watchlist_entry(1, "EURUSD", "M5", "trend", "auto")
-    assert entry == {"id": 1, "symbol": "EURUSD", "timeframe": "M5",
-                      "strategy": "trend", "mode": "auto", "enabled": True}
-
-def test_state_lock_defaults():
+def test_state_has_single_trading_mode_not_two_booleans():
+    # Two independent flags let the UI show a single-symbol selection while the watchlist
+    # traded other symbols. There is now exactly one source of truth.
     state = config.new_state()
-    assert state["lock_enabled"] is False
-    assert state["lock_passcode"] == ""
+    assert state["trading_mode"] == "off"
+    assert "auto_enabled" not in state
+    assert "watchlist_enabled" not in state
+
+def test_quality_gates_are_on_by_default():
+    # These three are the difference between the account's +$1.15M trade group and its
+    # -$5.7M one. Shipping them off by default would ship the failure mode.
+    assert config.GLOBAL_SETTINGS["min_reward_risk"] >= 1.5
+    assert config.GLOBAL_SETTINGS["max_sl_atr_multiple"] <= 3.0
+    # block_when_lot_capped is deliberately NOT here. Hitting the broker's cap makes the
+    # position smaller with the same stop, so it risks less than configured -- blocking it
+    # refuses a trade for being too safe. See tests/core/test_lot_cap_policy.py.
+
+def test_aggregate_risk_cap_is_reachable():
+    # A cap no realistic position set can hit is not a cap. max_concurrent_trades trades at
+    # risk_percent each must be able to reach it.
+    g = config.GLOBAL_SETTINGS
+    assert g["portfolio_risk_filter_enabled"] is True
+    assert g["max_portfolio_risk_percent"] <= g["risk_percent"] * g["max_concurrent_trades"] * 2
+
+def test_no_default_timeframe_is_one_where_spread_swamps_the_stop():
+    # Measured on this broker's own bars: on M1 the round-trip spread is 54-89% of a
+    # 1.5x-ATR stop on the FX majors. No entry rule survives that, so M1 must not be a
+    # default anywhere.
+    assert config.new_state()["timeframe"] != "M1"
+    for name, settings in config.DEFAULT_SETTINGS.items():
+        assert settings["timeframe"] != "M1", name
