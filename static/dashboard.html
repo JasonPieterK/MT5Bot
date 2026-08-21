@@ -1264,15 +1264,24 @@ async function saveSettings() {
   // grid would rip the control out from under the user mid-edit.
 }
 
+// Anything that changes WHAT is being traded has to update both halves of the screen at
+// once. The header polls twice a second and the "Why no trade?" panel every four, so
+// refreshing only the header left the two naming different symbols or timeframes for up to
+// a full poll -- on a screen whose whole job is telling you what the bot is about to trade.
+function refreshTradedTarget() {
+  refreshStatus();
+  loadWhyNoTrade();
+}
+
 document.getElementById("symbolSelect").onchange = async (e) => {
   await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ symbol: e.target.value }) });
-  refreshStatus();
+  refreshTradedTarget();
 };
 document.getElementById("tfSelect").onchange = async (e) => {
   await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ timeframe: e.target.value }) });
-  refreshStatus();
+  refreshTradedTarget();
 };
 document.getElementById("strategySelect").onchange = async (e) => {
   await fetch("/api/select", { method: "POST", headers: {"Content-Type":"application/json"},
@@ -1282,7 +1291,7 @@ document.getElementById("strategySelect").onchange = async (e) => {
     renderTabs();
     renderSettingsForm();
   }
-  refreshStatus();
+  refreshTradedTarget();
 };
 
 /* ---------- Trading mode: ONE control, two states ----------
