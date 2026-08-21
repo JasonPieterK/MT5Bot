@@ -23,6 +23,7 @@ import core.engine as engine
 import automation.journal as journal
 import core.ml_filter as ml_filter
 import core.mt5_bridge as mt5_bridge
+import core.mt5_retcodes as mt5_retcodes
 import core.mt5_status_sync as mt5_status_sync
 import core.persistence as persistence
 import core.profiles as profiles
@@ -176,7 +177,10 @@ def list_symbols():
 
 @app.route("/api/status")
 def status():
-    positions = bridge.get_open_positions(state["symbol"])
+    # Every open position, not just the header symbol's. Filtering here meant a position on
+    # any other symbol was counted in the account strip but never appeared in the table --
+    # which reads as "the table is stale" rather than "you are looking at one symbol".
+    positions = bridge.get_open_positions()
     equity = bridge.get_account_equity()
     mode = state.get("trading_mode", "off")
     return jsonify({
@@ -377,12 +381,26 @@ def set_trading_mode():
 
 @app.route("/api/close_all", methods=["POST"])
 def close_all():
-    positions = bridge.get_open_positions(state["symbol"])
-    app_logger.info(f"Close all requested: closing {len(positions)} open position(s) on {state['symbol']}")
+    # EVERY position, on every symbol. This was filtered to the header symbol, so the
+    # emergency button reported success while trades on other symbols stayed open and the
+    # user believed the account was flat.
+    positions = bridge.get_open_positions()
+    app_logger.warning(f"Close all requested: closing {len(positions)} open position(s) across "
+                        f"{len({p['symbol'] for p in positions})} symbol(s)")
+    closed, failed = 0, []
     for pos in positions:
-        bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"], pos["type"],
-                               global_settings["slippage_points"])
-    return jsonify({"ok": True})
+        ok, retcode = bridge.close_position(pos["ticket"], pos["symbol"], pos["volume"],
+                                             pos["type"], global_settings["slippage_points"])
+        if ok:
+            closed += 1
+        else:
+            failed.append({"ticket": pos["ticket"], "symbol": pos["symbol"], "retcode": retcode})
+            app_logger.error(f"Close all: ticket {pos['ticket']} ({pos['symbol']}) did NOT close "
+                              f"— {mt5_retcodes.explain(retcode)}")
+    if failed:
+        app_logger.error(f"Close all finished with {len(failed)} position(s) STILL OPEN. "
+                          f"The account is not flat.")
+    return jsonify({"ok": not failed, "closed": closed, "failed": failed})
 
 
 def _clamp_volume(symbol, volume):

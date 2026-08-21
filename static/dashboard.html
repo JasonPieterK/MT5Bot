@@ -1076,6 +1076,24 @@ async function loadSymbolSuggestions() {
 loadSymbolSuggestions();
 
 async function refreshStatus() {
+  try { await refreshStatusInner(); }
+  catch (e) {
+    // One stale element reference used to kill the whole render silently: a leftover
+    // getElementById for a deleted card threw on every poll, so the positions table, the
+    // trading-mode banner and the engine-health strip all stopped updating and the screen
+    // looked frozen with no clue why. Surface it instead of dying quietly.
+    console.error("refreshStatus failed:", e);
+    const banner = document.getElementById("apiErrorBanner");
+    if (banner) {
+      const t = document.getElementById("apiErrorBannerText");
+      if (t) t.textContent = "The dashboard could not refresh (" + (e && e.message) +
+                              "). The bot itself is unaffected — see the browser console.";
+      banner.style.display = "";
+    }
+  }
+}
+
+async function refreshStatusInner() {
   const res = await fetch("/api/status");
   const data = await res.json();
   const symbolSelect = document.getElementById("symbolSelect");
@@ -1083,7 +1101,6 @@ async function refreshStatus() {
   const tfSelect = document.getElementById("tfSelect");
   const strategySelect = document.getElementById("strategySelect");
   renderTradingMode(data.trading_mode || "off", data);
-  document.getElementById("mtSymbolNote").textContent = `${data.symbol} · market order`;
   renderEngineHealth(data);
   // Never clobber a control the user is actively editing -- this poll runs every couple of
   // seconds and used to wipe a half-typed symbol before it could be committed.
