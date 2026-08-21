@@ -811,8 +811,11 @@ def _compute_risk_percents():
         state["peak_equity"] = peak
         drawdown_percent = ((peak - equity) / peak * 100) if peak > 0 else 0.0
 
-    midnight = datetime.combine(datetime.now().date(), dtime.min)
-    closed = sum(d["profit"] for d in bridge.get_history_deals(midnight))
+    # The broker's day, not this machine's. history_deals_get reads its arguments in server
+    # time, and the two clocks differ by hours on most brokers -- measured +3h on this one.
+    # A local midnight therefore counted part of yesterday's losses as today's.
+    day_start = bridge.broker_day_start(state["symbol"])
+    closed = sum(d["profit"] for d in bridge.get_history_deals(day_start))
     floating = sum(p["profit"] for p in bridge.get_open_positions())
     day_pnl = closed + floating
     day_start_equity = equity - day_pnl

@@ -13,3 +13,4 @@ logs/*.log.1
 
 # Local editor/agent tooling, not part of the app
 .claude/
+logs/*.lock

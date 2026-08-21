@@ -50,13 +50,6 @@ def bollinger_bands(series, period=20, std_dev=2):
     return upper, mid, lower
 
 
-def stochastic(df, k_period=14, d_period=3):
-    low_min = df["low"].rolling(k_period).min()
-    high_max = df["high"].rolling(k_period).max()
-    k = 100 * (df["close"] - low_min) / (high_max - low_min)
-    d = k.rolling(d_period).mean()
-    return k, d
-
 
 def classic_pivot(high, low, close):
     pivot = (high + low + close) / 3

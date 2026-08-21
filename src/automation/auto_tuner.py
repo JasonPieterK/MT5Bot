@@ -22,10 +22,3 @@ def suggest_best_strategy(per_strategy_stats, min_trades=10):
     return max(eligible, key=lambda name: eligible[name]["profit_factor"])
 
 
-def apply_best_sweep_params(sweep_results, current_settings):
-    if not sweep_results:
-        return current_settings
-    best = sweep_results[0]
-    updated = dict(current_settings)
-    updated.update(best["params"])
-    return updated

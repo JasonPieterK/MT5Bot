@@ -37,7 +37,3 @@ def calc_portfolio_risk_percent(open_positions, equity, tick_economics=None):
     return (total_risk / equity) * 100
 
 
-def check_portfolio_risk_allowed(open_positions, equity, max_portfolio_risk_percent,
-                                  tick_economics=None):
-    current = calc_portfolio_risk_percent(open_positions, equity, tick_economics)
-    return current < max_portfolio_risk_percent

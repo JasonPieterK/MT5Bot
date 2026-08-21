@@ -12,21 +12,3 @@ def test_log_execution_writes_header_and_row(tmp_path, monkeypatch):
     assert lines[1] == "EURUSD,123.5,10009,False"
 
 
-def test_summarize_computes_avg_latency_and_requote_rate():
-    rows = [
-        {"symbol": "EURUSD", "latency_ms": "100", "requoted": "False"},
-        {"symbol": "EURUSD", "latency_ms": "200", "requoted": "True"},
-    ]
-    summary = execution_log.summarize(rows)
-    assert summary["EURUSD"]["count"] == 2
-    assert summary["EURUSD"]["avg_latency_ms"] == 150.0
-    assert summary["EURUSD"]["requote_rate_percent"] == 50.0
-
-
-def test_summarize_separates_symbols():
-    rows = [
-        {"symbol": "EURUSD", "latency_ms": "100", "requoted": "False"},
-        {"symbol": "GBPUSD", "latency_ms": "50", "requoted": "False"},
-    ]
-    summary = execution_log.summarize(rows)
-    assert set(summary.keys()) == {"EURUSD", "GBPUSD"}

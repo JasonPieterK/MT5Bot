@@ -28,16 +28,3 @@ def test_suggest_best_strategy_none_when_no_eligible():
     assert auto_tuner.suggest_best_strategy(stats, min_trades=10) is None
 
 
-def test_apply_best_sweep_params_updates_settings():
-    current = {"fast_period": 9, "slow_period": 21, "ma_type": "EMA"}
-    sweep_results = [
-        {"params": {"fast_period": 13, "slow_period": 34}, "stats": {"profit_factor": 2.0}},
-        {"params": {"fast_period": 5, "slow_period": 21}, "stats": {"profit_factor": 1.0}},
-    ]
-    updated = auto_tuner.apply_best_sweep_params(sweep_results, current)
-    assert updated == {"fast_period": 13, "slow_period": 34, "ma_type": "EMA"}
-
-
-def test_apply_best_sweep_params_no_results_returns_unchanged():
-    current = {"fast_period": 9}
-    assert auto_tuner.apply_best_sweep_params([], current) == current

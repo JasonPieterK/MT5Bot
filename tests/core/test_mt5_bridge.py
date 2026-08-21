@@ -191,31 +191,6 @@ def test_get_symbol_point_falls_back_when_symbol_unknown(mt5_mock):
     assert bridge.get_symbol_point("BADSYMBOL") == 0.0001
 
 
-def test_place_pending_order_buy_limit(mt5_mock):
-    bridge, fake = mt5_mock
-    fake.ORDER_TYPE_BUY_LIMIT = 2
-    fake.order_send.return_value = types.SimpleNamespace(retcode=10009, order=42)
-    ok, retcode = bridge.place_pending_order("EURUSD", "buy_limit", 0.1, price=1.0950, sl=1.09, tp=1.10,
-                                              slippage_points=20)
-    assert ok is True
-    assert retcode == 10009
-    sent = fake.order_send.call_args[0][0]
-    assert sent["action"] == fake.TRADE_ACTION_PENDING
-    assert sent["type"] == fake.ORDER_TYPE_BUY_LIMIT
-    assert sent["price"] == 1.0950
-    assert sent["volume"] == 0.1
-
-
-def test_place_pending_order_reports_failure(mt5_mock):
-    bridge, fake = mt5_mock
-    fake.ORDER_TYPE_SELL_LIMIT = 3
-    fake.order_send.return_value = types.SimpleNamespace(retcode=10004, order=None)
-    ok, retcode = bridge.place_pending_order("EURUSD", "sell_limit", 0.1, price=1.10, sl=0, tp=0,
-                                              slippage_points=20)
-    assert ok is False
-    assert retcode == 10004
-
-
 def test_close_position_by_ticket_success(mt5_mock):
     bridge, fake = mt5_mock
     fake.positions_get.return_value = [
@@ -586,23 +561,6 @@ def test_modify_position_never_sends_a_filling_mode(mt5_mock):
     assert "type_filling" not in fake.order_send.call_args[0][0]
     assert fake.order_send.call_count == 1
 
-
-def test_pending_order_also_cycles_fill_modes(mt5_mock):
-    bridge, fake = mt5_mock
-    _fill_fake(fake)
-    fake.ORDER_TYPE_BUY_LIMIT = 2
-    bridge._fill_mode_cache.clear()
-    fake.order_send.side_effect = [
-        types.SimpleNamespace(retcode=10030, order=None),
-        types.SimpleNamespace(retcode=10009, order=7),
-    ]
-    ok, _retcode = bridge.place_pending_order("EURUSD", "buy_limit", 0.1, price=1.09,
-                                               sl=None, tp=None, slippage_points=20)
-    assert ok is True
-    assert fake.order_send.call_count == 2
-
-
-# ---------- resolve_symbol: broker suffixes and Market Watch selection ----------
 
 def test_resolve_symbol_returns_visible_symbol_untouched(mt5_mock):
     bridge, fake = mt5_mock

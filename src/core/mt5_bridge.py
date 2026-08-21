@@ -333,6 +333,32 @@ def modify_position(ticket, sl, tp):
     return _send(request)
 
 
+def broker_clock_offset(symbol):
+    """How far the broker's clock runs from this machine's, as a timedelta.
+
+    mt5.history_deals_get() interprets its date arguments in SERVER time, but a caller
+    naturally builds them from datetime.now(). Measured against a live XM account the broker
+    ran +3h, so a "since midnight" window was three hours out -- the previous broker day's
+    losses counted as today's and the current morning's did not. That decides when the
+    daily-loss kill switch fires, so it is measured from a real tick rather than assumed."""
+    from datetime import datetime, timedelta
+    try:
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None or not getattr(tick, "time", 0):
+            return timedelta(0)
+        return datetime.fromtimestamp(tick.time) - datetime.now()
+    except Exception:
+        return timedelta(0)   # no offset is safer than a guessed one
+
+
+def broker_day_start(symbol):
+    """Midnight of the current BROKER day, expressed the way history_deals_get expects."""
+    from datetime import datetime
+    offset = broker_clock_offset(symbol)
+    broker_now = datetime.now() + offset
+    return datetime.combine(broker_now.date(), datetime.min.time()) + offset
+
+
 def get_history_deals(from_date):
     deals = mt5.history_deals_get(from_date, datetime.now())
     if deals is None:
@@ -392,23 +418,6 @@ def get_symbol_point(symbol):
     info = mt5.symbol_info(symbol)
     return info.point if info and info.point else 0.0001
 
-
-def place_pending_order(symbol, order_type, volume, price, sl, tp, slippage_points, magic=0):
-    """Manual-trading limit order. order_type is 'buy_limit' or 'sell_limit'."""
-    type_map = {"buy_limit": mt5.ORDER_TYPE_BUY_LIMIT, "sell_limit": mt5.ORDER_TYPE_SELL_LIMIT}
-    request = {
-        "action": mt5.TRADE_ACTION_PENDING,
-        "symbol": symbol,
-        "volume": volume,
-        "type": type_map[order_type],
-        "price": price,
-        "sl": sl,
-        "tp": tp,
-        "deviation": slippage_points,
-        "magic": magic,
-        # type_filling is set by _send, which cycles modes until the broker accepts one.
-    }
-    return _send(request)
 
 
 def close_position_by_ticket(ticket, slippage_points):

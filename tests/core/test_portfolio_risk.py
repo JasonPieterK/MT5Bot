@@ -50,13 +50,3 @@ def test_unusable_tick_economics_fall_back_instead_of_dividing_by_zero():
     assert abs(risk - 0.5) < 1e-6
 
 
-def test_check_allowed_under_cap():
-    positions = [{"symbol": "EURUSD", "price_open": 1.1000, "sl": 1.0950, "volume": 0.1}]
-    assert portfolio_risk.check_portfolio_risk_allowed(
-        positions, 10000, max_portfolio_risk_percent=10.0, tick_economics=fx_economics) is True
-
-
-def test_check_blocked_over_cap():
-    positions = [{"symbol": "EURUSD", "price_open": 1.1000, "sl": 1.0000, "volume": 5.0}]
-    assert portfolio_risk.check_portfolio_risk_allowed(
-        positions, 10000, max_portfolio_risk_percent=1.0, tick_economics=fx_economics) is False
