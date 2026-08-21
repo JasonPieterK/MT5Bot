@@ -127,7 +127,7 @@ By using this software, you acknowledge and accept all risks and agree that the 
 
 ## License
 
-MIT Licenses
+MIT License — also in [LICENSE](LICENSE).
 
 Copyright (c) 2026 Jason Pieter K
 
