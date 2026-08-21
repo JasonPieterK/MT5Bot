@@ -599,6 +599,7 @@
           <div class="card-head"><i class="ph-bold ph-sliders-horizontal"></i><span class="card-head-title">Trading profile</span><span class="card-head-note">risk posture</span></div>
           <div class="card-body">
             <p class="hint">A profile is a bundle of risk limits: how much one trade may cost, how many run at once, and when the bot stops for the day. <strong>These are risk settings only</strong> &mdash; no strategy here has a demonstrated edge, so no preset picks one for you or is expected to make money.</p>
+            <p class="hint" id="profilePricingNote" style="display:none;color:var(--amber);"></p>
             <div class="profile-active" id="profileActive" data-tip="The profile currently in force, and the risk it actually trades at on this account.">No profile applied yet &mdash; the bot is using its built-in defaults.</div>
             <div class="field">
               <label for="profileSelect" data-tip="Pick a risk posture. Nothing changes until you press Apply.">Preset</label>
@@ -653,7 +654,6 @@
           </div>
         </div>
         </div>
-      </div>
       <div class="main-panel">
         <div class="card" id="whyDashCard">
           <div class="card-head">
@@ -1693,16 +1693,36 @@ function renderProfilePreview() {
     `<h4 class="sub"><i class="ph-bold ph-list-checks"></i>What applying this changes</h4>` + changes;
 }
 
+let profilesRetry = null;
 async function loadProfiles() {
-  try {
-    profilesData = await (await fetch("/api/profiles")).json();
-  } catch (e) { return; }
   const select = document.getElementById("profileSelect");
+  try {
+    const resp = await fetch("/api/profiles");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    profilesData = await resp.json();
+  } catch (e) {
+    // Giving up silently left an empty Preset box with no explanation and no retry -- the
+    // user just saw a blank dropdown. Say so, and try again shortly.
+    if (!select.options.length) {
+      select.innerHTML = `<option value="">Could not load presets — retrying…</option>`;
+    }
+    clearTimeout(profilesRetry);
+    profilesRetry = setTimeout(loadProfiles, 4000);
+    return;
+  }
+  clearTimeout(profilesRetry);
   const keep = select.value;
   select.innerHTML = profilesData.presets.map(p =>
     `<option value="${escHtml(p.id)}">${escHtml(p.label)}</option>`).join("");
   const active = profilesData.active_profile;
   select.value = keep || (active && active.id) || "balanced";
+  const priced = profilesData.priced !== false;
+  const note = document.getElementById("profilePricingNote");
+  if (note) {
+    note.textContent = priced ? "" :
+      "The account could not be read just now, so the effective-risk figures below are unavailable. The presets themselves still apply normally.";
+    note.style.display = priced ? "none" : "";
+  }
   const box = document.getElementById("profileActive");
   box.innerHTML = active
     ? `<span class="profile-active-name">Active: ${escHtml(active.label)}</span>` +

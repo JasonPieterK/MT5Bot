@@ -640,7 +640,21 @@ def _active_profile_bounds():
 
 def _preset_inputs():
     """(equity, per_lot, broker_max_lot, lot_step, symbol) for the symbol currently targeted.
-    per_lot is what turns a preset's nominal risk into the risk this account can express."""
+    per_lot is what turns a preset's nominal risk into the risk this account can express.
+
+    Every failure here degrades to zeros rather than raising. The presets themselves are
+    static data; pricing them against the account is a bonus. When a broker hiccup made this
+    raise, the whole /api/profiles route 500'd and the dashboard was left with an empty
+    Preset dropdown and no explanation."""
+    try:
+        return _preset_inputs_priced()
+    except Exception as exc:
+        app_logger.warning(f"Could not price the trading presets against the account ({exc}). "
+                            f"They are still listed, without the effective-risk figures.")
+        return 0.0, 0.0, 0.0, 0.01, None
+
+
+def _preset_inputs_priced():
     targets = _traded_targets()
     if not targets:
         return 0.0, 0.0, 0.0, 0.01, None
@@ -667,6 +681,10 @@ def get_profiles():
         resolved.append(item)
     return jsonify({
         "presets": resolved,
+        # False when the account could not be read: the presets are listed but their
+        # effective-risk figures are absent, and the UI says so rather than showing zeros
+        # as though they were real.
+        "priced": bool(equity and per_lot),
         "active_profile": state.get("active_profile"),
         "priced_on": {"symbol": symbol, "equity": equity, "per_lot": per_lot,
                       "broker_max_lot": broker_max_lot},
