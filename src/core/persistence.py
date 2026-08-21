@@ -41,8 +41,17 @@ def load_all():
         return None
     try:
         with open(STATE_PATH, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+            saved = json.load(f)
+        # Valid JSON is not the same as usable settings. A list, a string or a number parses
+        # cleanly and then blows up on .get() -- and because _load_persisted_state() runs at
+        # import time of app.py, that AttributeError stopped the app booting at all, with the
+        # corrupt-file recovery never firing because the JSON itself was fine.
+        if saved is None:
+            return None
+        if not isinstance(saved, dict):
+            raise ValueError(f"expected an object at the top level, found {type(saved).__name__}")
+        return saved
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError, ValueError) as exc:
         aside = _set_aside_corrupt_file()
         app_logger.error(
             f"Your saved settings file ({STATE_PATH}) is damaged and could not be read: {exc}. "
